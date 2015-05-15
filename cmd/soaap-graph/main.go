@@ -52,12 +52,6 @@ func main() {
 		return
 	}
 
-	results, err := soaap.LoadResults(f, report)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s\n", err)
-		return
-	}
-
 	//
 	// Open output file:
 	//
@@ -73,17 +67,21 @@ func main() {
 	}
 
 	//
-	// Combine callgraphs of the requested analyses:
+	// Is the input file a binary-encoded graph or a set of SOAAP results
+	// that we need to extract a graph from?
 	//
-	graph := soaap.NewCallGraph()
-	for _, a := range analyses {
-		g, err := results.ExtractGraph(a, report)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			return
-		}
+	var graph soaap.CallGraph
 
-		graph.Union(g)
+	if strings.HasSuffix(f.Name(), ".graph") {
+		graph, err = soaap.LoadGraph(f, report)
+
+	} else {
+		graph, err = analyzeResultsFile(f, analyses)
+	}
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		return
 	}
 
 	//
@@ -106,6 +104,28 @@ func dotHeader() string {
 	rankdir = "BT";
 
 `
+}
+
+func analyzeResultsFile(f *os.File, analyses []string) (soaap.CallGraph, error) {
+	//
+	// Combine callgraphs of the requested analyses:
+	//
+	results, err := soaap.LoadResults(f, report)
+	if err != nil {
+		return soaap.CallGraph{}, err
+	}
+
+	graph := soaap.NewCallGraph()
+	for _, a := range analyses {
+		g, err := results.ExtractGraph(a, report)
+		if err != nil {
+			return graph, err
+		}
+
+		graph.Union(g)
+	}
+
+	return graph, err
 }
 
 func printUsage() {
