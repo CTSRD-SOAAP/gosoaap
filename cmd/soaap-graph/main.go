@@ -10,10 +10,24 @@ import (
 	"github.com/CTSRD-SOAAP/gosoaap"
 )
 
+type Analyses []string
+
+func (a *Analyses) Set(value string) error {
+	*a = strings.Split(value, ",")
+	return nil
+}
+
+func (a Analyses) String() string {
+	return strings.Join(a, ", ")
+}
+
 func main() {
 	//
 	// Command-line arguments:
 	//
+	analyses := Analyses{"vuln"}
+	flag.Var(&analyses, "analyses", "SOAAP analysis results to graph")
+
 	output := flag.String("output", "-", "output GraphViz file")
 	flag.Parse()
 
@@ -63,7 +77,16 @@ func main() {
 		return
 	}
 
-	graph := soaap.VulnGraph(results)
+	graph := soaap.NewCallGraph()
+	for _, a := range analyses {
+		fn, ok := soaap.GraphFns[a]
+		if !ok {
+			fmt.Fprintf(os.Stderr, "unknown analysis: '%s'", a)
+			return
+		}
+
+		graph.Union(fn(results))
+	}
 
 	fmt.Fprintln(out, "digraph {")
 	fmt.Fprintln(out, dotHeader())

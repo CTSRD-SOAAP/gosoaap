@@ -83,6 +83,16 @@ type Call struct {
 }
 
 //
+// A function that extracts a CallGraph from SOAAP Results.
+//
+type GraphFn func(results Results) CallGraph
+
+var GraphFns map[string]GraphFn = map[string]GraphFn{
+	"privaccess": PrivAccessGraph,
+	"vuln":       VulnGraph,
+}
+
+//
 // Construct a callgraph from SOAAP's vulnerability analysis.
 //
 func VulnGraph(results Results) CallGraph {
