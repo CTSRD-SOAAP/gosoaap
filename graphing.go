@@ -104,6 +104,8 @@ func GraphAnalyses() []string {
 	return keys
 }
 
+type callSiteLabeler func(CallSite) (string, GraphNode)
+
 //
 // Construct a callgraph from SOAAP's vulnerability analysis.
 //
@@ -130,20 +132,7 @@ func VulnGraph(results Results) CallGraph {
 			return key, node
 		}
 
-		var callee string
-
-		trace.Foreach(results.Traces, func(cs CallSite) {
-			key, n := fn(cs)
-			graph.Nodes[key] = n
-
-			caller := key
-
-			if callee != "" {
-				graph.AddCall(caller, callee)
-			}
-
-			callee = caller
-		})
+		graph.Union(trace.graph(results.Traces, fn))
 	}
 
 	return graph
@@ -176,21 +165,33 @@ func PrivAccessGraph(results Results) CallGraph {
 			return key, node
 		}
 
-		var callee string
-
-		trace.Foreach(results.Traces, func(cs CallSite) {
-			key, n := fn(cs)
-			graph.Nodes[key] = n
-
-			caller := key
-
-			if callee != "" {
-				graph.AddCall(caller, callee)
-			}
-
-			callee = caller
-		})
+		graph.Union(trace.graph(results.Traces, fn))
 	}
+
+	return graph
+}
+
+//
+// Graph a single CallTrace, using a callSiteLabeler function to convert
+// CallSite instances into graph nodes with identifiers, tags, etc.,
+// appropriate to the analysis we're performing.
+//
+func (t CallTrace) graph(traces []CallTrace, nm callSiteLabeler) CallGraph {
+	graph := NewCallGraph()
+	var callee string
+
+	t.Foreach(traces, func(cs CallSite) {
+		identifier, node := nm(cs)
+		graph.Nodes[identifier] = node
+
+		caller := identifier
+
+		if callee != "" {
+			graph.AddCall(caller, callee)
+		}
+
+		callee = caller
+	})
 
 	return graph
 }
