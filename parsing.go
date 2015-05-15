@@ -1,11 +1,13 @@
 package soaap
 
-import "encoding/json"
-import "errors"
-import "fmt"
-import "os"
-import "strconv"
-import "strings"
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+)
 
 //
 // Parse a JSON file emitted by SOAAP.

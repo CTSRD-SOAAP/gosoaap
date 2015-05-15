@@ -1,9 +1,11 @@
 package soaap
 
-import "fmt"
-import "errors"
-import "math"
-import "strings"
+import (
+	"errors"
+	"fmt"
+	"math"
+	"strings"
+)
 
 type CallGraph struct {
 	Nodes map[string]GraphNode
