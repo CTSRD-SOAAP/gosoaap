@@ -106,6 +106,11 @@ func (n GraphNode) Dot() string {
 		n.Name, n.Description)
 }
 
+func (n GraphNode) HasTag(tag string) bool {
+	_, present := n.Tags[tag]
+	return present
+}
+
 type Call struct {
 	// Identifier of the caller.
 	Caller string
