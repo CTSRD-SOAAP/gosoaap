@@ -51,3 +51,9 @@ Usage:
 $ soaap-graph --output=soaap.dot soaap.gob
 $ dot -Tpdf -o soaap.pdf soaap.dot
 ```
+
+
+## Library API
+
+API documentation can be viewed at
+[godoc.org](http://godoc.org/github.com/CTSRD-SOAAP/gosoaap).
