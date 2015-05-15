@@ -7,9 +7,9 @@ tool in the textual JSON format.
 ## Installation
 
 1. Install Go
-  a. FreeBSD: `pkg install go`
-  a. Mac OS X: `brew install go`
-  a. [From source](https://golang.org/doc/install)
+  1. FreeBSD: `pkg install go`
+  1. Mac OS X: `brew install go`
+  1. [From source](https://golang.org/doc/install)
 
 1. Set the `GOPATH` environment variable, e.g.:
     ```shell
