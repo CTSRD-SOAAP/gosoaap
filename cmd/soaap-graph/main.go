@@ -33,6 +33,7 @@ func main() {
 	output := flag.String("output", "-", "output file")
 
 	binout := flag.Bool("binary", false, "write binary output")
+	simplify := flag.Bool("simplify", false, "simplify callgraph")
 
 	flag.Parse()
 
@@ -82,6 +83,13 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %s\n", err)
 		return
+	}
+
+	//
+	// Apply any requested transformations:
+	//
+	if *simplify {
+		graph.Simplify()
 	}
 
 	//

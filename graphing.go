@@ -45,6 +45,13 @@ func (cg *CallGraph) Save(f *os.File) error {
 	return gob.NewEncoder(f).Encode(cg)
 }
 
+//
+// Simplify a CallGraph by collapsing call chains and dropping any
+// unreferenced calls.
+//
+func (cg *CallGraph) Simplify() {
+}
+
 func (cg *CallGraph) Union(g CallGraph) error {
 	for id, node := range g.Nodes {
 		// If we already have a GraphNode with this identifier,
