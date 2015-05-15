@@ -1,6 +1,11 @@
 package soaap
 
-import "fmt"
+import (
+	"encoding/gob"
+	"fmt"
+	"os"
+	"strings"
+)
 
 //
 // The results of running SOAAP on an application.
@@ -13,6 +18,20 @@ type Results struct {
 	Vulnerabilities []Vuln       `json:"vulnerability_warning"`
 	PrivateAccess   []PrivAccess `json:"private_access"`
 	Traces          []CallTrace  `json:"traces"`
+}
+
+//
+// Load SOAAP results from an os.File (either binary- or JSON-encoded).
+//
+func LoadResults(f *os.File, report func(string)) (Results, error) {
+	if strings.HasSuffix(f.Name(), ".gob") {
+		var results Results
+		err := gob.NewDecoder(f).Decode(&results)
+
+		return results, err
+	}
+
+	return ParseJSON(f, report)
 }
 
 func (r Results) ExtractGraph(analysis string, progress func(string)) (CallGraph, error) {

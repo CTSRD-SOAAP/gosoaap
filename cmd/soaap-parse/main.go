@@ -25,7 +25,7 @@ func main() {
 	input := flag.Args()[0]
 
 	//
-	// Open input, output files:
+	// Load input file:
 	//
 	f, err := os.Open(input)
 	if err != nil {
@@ -33,6 +33,15 @@ func main() {
 		return
 	}
 
+	results, err := soaap.LoadResults(f, reportProgress)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		return
+	}
+
+	//
+	// Open output file:
+	//
 	var outfile *os.File
 	if *output == "-" {
 		outfile = os.Stdout
@@ -44,18 +53,6 @@ func main() {
 		}
 	}
 	out := io.Writer(outfile)
-
-	//
-	// Parse the JSON:
-	//
-	results, err := soaap.ParseJSON(f, func(progress string) {
-		fmt.Println(progress)
-		os.Stdout.Sync()
-	})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s\n", err)
-		return
-	}
 
 	//
 	// Encode it as a gob of data:
@@ -74,4 +71,8 @@ func printUsage() {
 
 	fmt.Fprintf(os.Stderr, "Options:\n")
 	flag.PrintDefaults()
+}
+
+func reportProgress(message string) {
+	fmt.Println(message)
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/gob"
 	"flag"
 	"fmt"
 	"os"
@@ -42,7 +41,7 @@ func main() {
 	input := flag.Args()[0]
 
 	//
-	// Open input, output files:
+	// Load input file:
 	//
 	f, err := os.Open(input)
 	if err != nil {
@@ -50,6 +49,15 @@ func main() {
 		return
 	}
 
+	results, err := soaap.LoadResults(f, report)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		return
+	}
+
+	//
+	// Open output file:
+	//
 	var out *os.File
 	if *output == "-" {
 		out = os.Stdout
@@ -62,22 +70,8 @@ func main() {
 	}
 
 	//
-	// Load the data (JSON- or gob-encoded):
+	// Combine callgraphs of the requested analyses:
 	//
-	var results soaap.Results
-	report("Loading data from " + input)
-
-	if strings.HasSuffix(input, ".gob") {
-		decoder := gob.NewDecoder(f)
-		err = decoder.Decode(&results)
-	} else {
-		results, err = soaap.ParseJSON(f, report)
-	}
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s\n", err)
-		return
-	}
-
 	graph := soaap.NewCallGraph()
 	for _, a := range analyses {
 		g, err := results.ExtractGraph(a, report)
@@ -89,6 +83,9 @@ func main() {
 		graph.Union(g)
 	}
 
+	//
+	// Output the results in GraphViz DOT format:
+	//
 	fmt.Fprintln(out, "digraph {")
 	fmt.Fprintln(out, dotHeader())
 
