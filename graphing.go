@@ -85,6 +85,19 @@ func (cg *CallGraph) Union(g CallGraph) error {
 	return nil
 }
 
+//
+// A node in a call graph.
+//
+// This is derived from a call site or other program location, but can have
+// an arbitrary name and description appropriate to a particular analysis.
+//
+type GraphNode struct {
+	Name        string
+	Description string
+	Tags        map[string]bool
+}
+
+// Construct a GraphNode.
 func Node(name string, desc string, tags []string) GraphNode {
 	node := GraphNode{name, desc, make(map[string]bool)}
 	for _, s := range tags {
@@ -94,12 +107,11 @@ func Node(name string, desc string, tags []string) GraphNode {
 	return node
 }
 
-type GraphNode struct {
-	Name        string
-	Description string
-	Tags        map[string]bool
-}
-
+//
+// Construct a GraphViz Dot description of a GraphNode.
+//
+// This applies SOAAP-specific styling depending on a node's tags.
+//
 func (n GraphNode) Dot() string {
 	return fmt.Sprintf(
 		"\"%s\" [ label = \"%s\" ];",
