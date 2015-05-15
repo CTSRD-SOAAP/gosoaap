@@ -44,6 +44,10 @@ func (r Results) ExtractGraph(analysis string, progress func(string)) (CallGraph
 	return fn(r, progress), nil
 }
 
+func (r Results) Save(f *os.File) error {
+	return gob.NewEncoder(f).Encode(r)
+}
+
 //
 // Information that SOAAP reports about a vulnerability.
 //

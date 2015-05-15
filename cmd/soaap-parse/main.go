@@ -1,10 +1,8 @@
 package main
 
 import (
-	"encoding/gob"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/CTSRD-SOAAP/gosoaap"
@@ -52,14 +50,12 @@ func main() {
 			return
 		}
 	}
-	out := io.Writer(outfile)
 
 	//
 	// Encode it as a gob of data:
 	//
 	fmt.Print("Encoding...")
-	encoder := gob.NewEncoder(out)
-	encoder.Encode(results)
+	results.Save(outfile)
 	fmt.Println(" done.")
 
 	outfile.Sync()
