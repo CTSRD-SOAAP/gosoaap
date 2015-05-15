@@ -30,7 +30,10 @@ func main() {
 			strings.Join(soaap.GraphAnalyses(), ", ")+
 			")")
 
-	output := flag.String("output", "-", "output GraphViz file")
+	output := flag.String("output", "-", "output file")
+
+	binout := flag.Bool("binary", false, "write binary output")
+
 	flag.Parse()
 
 	if len(flag.Args()) != 1 {
@@ -84,24 +87,12 @@ func main() {
 	}
 
 	//
-	// Output the results in GraphViz DOT format:
+	// Output the results:
 	//
-	fmt.Fprintln(out, "digraph {")
-	fmt.Fprintln(out, dotHeader())
-
-	for _, n := range graph.Nodes {
-		fmt.Fprintf(out, "	%s\n", n.Dot())
+	if *binout {
+	} else {
+		writeDot(graph, out)
 	}
-
-	for _, c := range graph.Calls {
-		caller := graph.Nodes[c.Caller]
-		callee := graph.Nodes[c.Callee]
-
-		fmt.Fprintf(out, "	\"%s\" -> \"%s\";\n",
-			caller.Name, callee.Name)
-	}
-
-	fmt.Fprintf(out, "}\n")
 }
 
 func dotHeader() string {
@@ -128,4 +119,23 @@ func printUsage() {
 func report(progress string) {
 	fmt.Println(progress)
 	os.Stdout.Sync()
+}
+
+func writeDot(graph soaap.CallGraph, out *os.File) {
+	fmt.Fprintln(out, "digraph {")
+	fmt.Fprintln(out, dotHeader())
+
+	for _, n := range graph.Nodes {
+		fmt.Fprintf(out, "	%s\n", n.Dot())
+	}
+
+	for _, c := range graph.Calls {
+		caller := graph.Nodes[c.Caller]
+		callee := graph.Nodes[c.Callee]
+
+		fmt.Fprintf(out, "	\"%s\" -> \"%s\";\n",
+			caller.Name, callee.Name)
+	}
+
+	fmt.Fprintf(out, "}\n")
 }
