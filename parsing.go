@@ -43,8 +43,15 @@ func ParseJSON(f *os.File, progress func(string)) (Results, error) {
 			// TODO
 
 		case "private_access":
-			// TODO
-			//json.Unmarshal(v, &soaap.PrivateAccess)
+			json.Unmarshal(v, &soaap.PrivateAccess)
+			for i, vuln := range soaap.PrivateAccess {
+				num, err := traceNumber(vuln.TraceName)
+				if err != nil {
+					panic(err)
+				}
+
+				soaap.PrivateAccess[i].Trace = num
+			}
 
 		case "private_leak":
 			// TODO

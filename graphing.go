@@ -3,6 +3,7 @@ package soaap
 import "flag"
 import "fmt"
 import "os"
+import "strings"
 
 func Node(name string, desc string, tags []string) GraphNode {
 	node := GraphNode{name, desc, make(map[string]bool)}
@@ -53,6 +54,54 @@ func VulnGraph(results Results) (map[string]GraphNode, []Call) {
 
 			node := Node(
 				cs.String()+"_"+v.Sandbox,
+				desc,
+				[]string{},
+			)
+
+			return key, node
+		}
+
+		var callee string
+
+		trace.Foreach(results.Traces, func(cs CallSite) {
+			key, n := fn(cs)
+			nodes[key] = n
+
+			caller := key
+
+			if callee != "" {
+				call := Call{caller, callee}
+				calls = append(calls, call)
+			}
+
+			callee = caller
+		})
+	}
+
+	return nodes, calls
+}
+
+//
+// Construct a callgraph of sandbox-private data accesses outside of sandboxes.
+//
+func PrivAccessGraph(results Results) (map[string]GraphNode, []Call) {
+	nodes := make(map[string]GraphNode)
+	calls := make([]Call, 0, 1000)
+
+	for _, a := range results.PrivateAccess {
+		trace := results.Traces[a.Trace]
+
+		fn := func(cs CallSite) (string, GraphNode) {
+			sandboxes := strings.Join(a.Sandboxes, ",")
+			key := cs.String() + " " + sandboxes
+
+			desc := cs.Function
+			if sandboxes != "" {
+				desc += "\\n<<" + sandboxes + ">>"
+			}
+
+			node := Node(
+				cs.String()+"_"+sandboxes,
 				desc,
 				[]string{},
 			)

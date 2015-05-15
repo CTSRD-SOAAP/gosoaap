@@ -10,9 +10,9 @@ import "fmt"
 // from these analyses.
 //
 type Results struct {
-	Vulnerabilities []Vuln `json:"vulnerability_warning"`
-	//PrivateAccess   interface{} `json:"private_access"`
-	Traces []CallTrace `json:"traces"`
+	Vulnerabilities []Vuln       `json:"vulnerability_warning"`
+	PrivateAccess   []PrivAccess `json:"private_access"`
+	Traces          []CallTrace  `json:"traces"`
 }
 
 //
@@ -29,6 +29,18 @@ type Vuln struct {
 	Restricted bool `json:"restricted_rights"`
 	Trace      int
 	TraceName  string `json:"trace_ref"`
+}
+
+//
+// Information SOAAP reports about access to a sandbox-private variable
+// outside of the sandbox.
+//
+type PrivAccess struct {
+	Function  string
+	Location  SourceLocation
+	Sandboxes []string `json:"sandbox_private"`
+	Trace     int
+	TraceName string `json:"trace_ref"`
 }
 
 //
