@@ -133,6 +133,20 @@ type Call struct {
 	Callee string
 }
 
+// Output GraphViz for a Call.
+func (c Call) Dot(graph CallGraph, weight int) string {
+	caller := graph.Nodes[c.Caller]
+	callee := graph.Nodes[c.Callee]
+
+	attrs := map[string]interface{}{
+		"penwidth": weight,
+		"weight":   weight,
+	}
+
+	return fmt.Sprintf("\"%s\" -> \"%s\" %s;\n",
+		caller.Name, callee.Name, dotAttrs(attrs))
+}
+
 //
 // A function that extracts a CallGraph from SOAAP Results.
 //
