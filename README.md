@@ -4,6 +4,24 @@ A Go library for working with SOAAP results, as they are emitted by the SOAAP
 tool in the textual JSON format.
 
 
+## Installation
+
+1. Install Go
+  a. FreeBSD: `pkg install go`
+  a. Mac OS X: `brew install go`
+  a. [From source](https://golang.org/doc/install)
+
+1. Set the `GOPATH` environment variable, e.g.:
+    ```shell
+    $ export GOPATH=$HOME/.go
+    ```
+
+1. Fetch and build this repository:
+    ```shell
+    $ go get github.com/CTSRD-SOAAP/gosoaap
+    ```
+
+
 ## Commands
 
 The library includes some command-line tools:
