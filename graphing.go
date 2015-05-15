@@ -1,7 +1,57 @@
 package soaap
 
 import "fmt"
+import "errors"
 import "strings"
+
+type CallGraph struct {
+	Nodes map[string]GraphNode
+	Calls []Call
+}
+
+func NewCallGraph() CallGraph {
+	return CallGraph{
+		make(map[string]GraphNode),
+		make([]Call, 0, 1000),
+	}
+}
+
+func (cg *CallGraph) AddCall(caller string, callee string) {
+	cg.Calls = append(cg.Calls, Call{caller, callee})
+}
+
+func (cg *CallGraph) Union(g CallGraph) error {
+	for id, node := range g.Nodes {
+		// If we already have a GraphNode with this identifier,
+		// merge the two descriptions and tag sets.
+		if n, have := cg.Nodes[id]; have {
+			if n.Name != node.Name {
+				return errors.New(fmt.Sprintf(
+					"Nodes in CallGraph union have"+
+						" same identifier ('%s') but"+
+						" different names ('%s' vs '%s')",
+					id, n.Name, node.Name))
+			}
+
+			if n.Description != node.Description {
+				node.Description =
+					n.Description + "\\n" + node.Description
+			}
+
+			for tag := range n.Tags {
+				node.Tags[tag] = true
+			}
+		}
+
+		cg.Nodes[id] = node
+	}
+
+	for _, call := range g.Calls {
+		cg.Calls = append(cg.Calls, call)
+	}
+
+	return nil
+}
 
 func Node(name string, desc string, tags []string) GraphNode {
 	node := GraphNode{name, desc, make(map[string]bool)}
@@ -35,9 +85,8 @@ type Call struct {
 //
 // Construct a callgraph from SOAAP's vulnerability analysis.
 //
-func VulnGraph(results Results) (map[string]GraphNode, []Call) {
-	nodes := make(map[string]GraphNode)
-	calls := make([]Call, 0, 1000)
+func VulnGraph(results Results) CallGraph {
+	graph := NewCallGraph()
 
 	for _, v := range results.Vulnerabilities {
 		trace := results.Traces[v.Trace]
@@ -63,28 +112,26 @@ func VulnGraph(results Results) (map[string]GraphNode, []Call) {
 
 		trace.Foreach(results.Traces, func(cs CallSite) {
 			key, n := fn(cs)
-			nodes[key] = n
+			graph.Nodes[key] = n
 
 			caller := key
 
 			if callee != "" {
-				call := Call{caller, callee}
-				calls = append(calls, call)
+				graph.AddCall(caller, callee)
 			}
 
 			callee = caller
 		})
 	}
 
-	return nodes, calls
+	return graph
 }
 
 //
 // Construct a callgraph of sandbox-private data accesses outside of sandboxes.
 //
-func PrivAccessGraph(results Results) (map[string]GraphNode, []Call) {
-	nodes := make(map[string]GraphNode)
-	calls := make([]Call, 0, 1000)
+func PrivAccessGraph(results Results) CallGraph {
+	graph := NewCallGraph()
 
 	for _, a := range results.PrivateAccess {
 		trace := results.Traces[a.Trace]
@@ -111,18 +158,17 @@ func PrivAccessGraph(results Results) (map[string]GraphNode, []Call) {
 
 		trace.Foreach(results.Traces, func(cs CallSite) {
 			key, n := fn(cs)
-			nodes[key] = n
+			graph.Nodes[key] = n
 
 			caller := key
 
 			if callee != "" {
-				call := Call{caller, callee}
-				calls = append(calls, call)
+				graph.AddCall(caller, callee)
 			}
 
 			callee = caller
 		})
 	}
 
-	return nodes, calls
+	return graph
 }

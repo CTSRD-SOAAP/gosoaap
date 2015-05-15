@@ -63,18 +63,18 @@ func main() {
 		return
 	}
 
-	nodes, calls := soaap.VulnGraph(results)
+	graph := soaap.VulnGraph(results)
 
 	fmt.Fprintln(out, "digraph {")
 	fmt.Fprintln(out, dotHeader())
 
-	for _, n := range nodes {
+	for _, n := range graph.Nodes {
 		fmt.Fprintf(out, "	%s\n", n.Dot())
 	}
 
-	for _, c := range calls {
-		caller := nodes[c.Caller]
-		callee := nodes[c.Callee]
+	for _, c := range graph.Calls {
+		caller := graph.Nodes[c.Caller]
+		callee := graph.Nodes[c.Callee]
 
 		fmt.Fprintf(out, "	\"%s\" -> \"%s\";\n",
 			caller.Name, callee.Name)
