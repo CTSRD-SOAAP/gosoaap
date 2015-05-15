@@ -15,6 +15,16 @@ type Results struct {
 	Traces          []CallTrace  `json:"traces"`
 }
 
+func (r Results) ExtractGraph(analysis string) (CallGraph, error) {
+	fn, ok := graphExtractors[analysis]
+	if !ok {
+		return CallGraph{},
+			fmt.Errorf("unknown analysis: '%s'", analysis)
+	}
+
+	return fn(r), nil
+}
+
 //
 // Information that SOAAP reports about a vulnerability.
 //

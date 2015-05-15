@@ -26,7 +26,10 @@ func main() {
 	// Command-line arguments:
 	//
 	analyses := Analyses{"vuln"}
-	flag.Var(&analyses, "analyses", "SOAAP analysis results to graph")
+	flag.Var(&analyses, "analyses",
+		"SOAAP analysis results to graph (options: "+
+			strings.Join(soaap.GraphAnalyses(), ", ")+
+			")")
 
 	output := flag.String("output", "-", "output GraphViz file")
 	flag.Parse()
@@ -79,13 +82,13 @@ func main() {
 
 	graph := soaap.NewCallGraph()
 	for _, a := range analyses {
-		fn, ok := soaap.GraphFns[a]
-		if !ok {
-			fmt.Fprintf(os.Stderr, "unknown analysis: '%s'", a)
+		g, err := results.ExtractGraph(a)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
 			return
 		}
 
-		graph.Union(fn(results))
+		graph.Union(g)
 	}
 
 	fmt.Fprintln(out, "digraph {")
