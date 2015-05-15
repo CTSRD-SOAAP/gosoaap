@@ -11,7 +11,7 @@ import (
 
 type CallGraph struct {
 	Nodes map[string]GraphNode
-	Calls []Call
+	Calls map[Call]int
 }
 
 //
@@ -20,7 +20,7 @@ type CallGraph struct {
 func NewCallGraph() CallGraph {
 	return CallGraph{
 		make(map[string]GraphNode),
-		make([]Call, 0, 1000),
+		make(map[Call]int),
 	}
 }
 
@@ -35,7 +35,7 @@ func LoadGraph(f *os.File, report func(string)) (CallGraph, error) {
 }
 
 func (cg *CallGraph) AddCall(caller string, callee string) {
-	cg.Calls = append(cg.Calls, Call{caller, callee})
+	cg.Calls[Call{caller, callee}] += 1
 }
 
 //
@@ -78,8 +78,8 @@ func (cg *CallGraph) Union(g CallGraph) error {
 		cg.Nodes[id] = node
 	}
 
-	for _, call := range g.Calls {
-		cg.Calls = append(cg.Calls, call)
+	for call, count := range g.Calls {
+		cg.Calls[call] += count
 	}
 
 	return nil

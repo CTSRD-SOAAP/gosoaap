@@ -157,7 +157,7 @@ func writeDot(graph soaap.CallGraph, out *os.File) {
 		fmt.Fprintf(out, "	%s\n", n.Dot())
 	}
 
-	for _, c := range graph.Calls {
+	for c, count := range graph.Calls {
 		caller := graph.Nodes[c.Caller]
 		callee := graph.Nodes[c.Callee]
 
