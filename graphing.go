@@ -1,9 +1,11 @@
 package soaap
 
 import (
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"math"
+	"os"
 	"strings"
 )
 
@@ -12,6 +14,9 @@ type CallGraph struct {
 	Calls []Call
 }
 
+//
+// Create a new, empty CallGraph with enough capacity to hold some calls.
+//
 func NewCallGraph() CallGraph {
 	return CallGraph{
 		make(map[string]GraphNode),
@@ -19,8 +24,25 @@ func NewCallGraph() CallGraph {
 	}
 }
 
+//
+// Load a CallGraph from a binary-encoded file.
+//
+func LoadGraph(f *os.File, report func(string)) (CallGraph, error) {
+	var graph CallGraph
+	err := gob.NewDecoder(f).Decode(&graph)
+
+	return graph, err
+}
+
 func (cg *CallGraph) AddCall(caller string, callee string) {
 	cg.Calls = append(cg.Calls, Call{caller, callee})
+}
+
+//
+// Save a CallGraph to an os.File using a binary encoding.
+//
+func (cg *CallGraph) Save(f *os.File) error {
+	return gob.NewEncoder(f).Encode(cg)
 }
 
 func (cg *CallGraph) Union(g CallGraph) error {
