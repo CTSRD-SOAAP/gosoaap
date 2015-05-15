@@ -1,8 +1,6 @@
 package soaap
 
-import "flag"
 import "fmt"
-import "os"
 import "strings"
 
 func Node(name string, desc string, tags []string) GraphNode {
@@ -127,12 +125,4 @@ func PrivAccessGraph(results Results) (map[string]GraphNode, []Call) {
 	}
 
 	return nodes, calls
-}
-
-func printUsage() {
-	fmt.Fprintf(os.Stderr,
-		"Usage:  soaap-graph [options] <input file>\n\n")
-
-	fmt.Fprintf(os.Stderr, "Options:\n")
-	flag.PrintDefaults()
 }
