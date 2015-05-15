@@ -113,9 +113,11 @@ func Node(name string, desc string, tags []string) GraphNode {
 // This applies SOAAP-specific styling depending on a node's tags.
 //
 func (n GraphNode) Dot() string {
-	return fmt.Sprintf(
-		"\"%s\" [ label = \"%s\" ];",
-		n.Name, n.Description)
+	attrs := map[string]interface{}{
+		"label": n.Description,
+	}
+
+	return fmt.Sprintf("\"%s\" %s;", n.Name, dotAttrs(attrs))
 }
 
 func (n GraphNode) HasTag(tag string) bool {
@@ -256,4 +258,24 @@ func (t CallTrace) graph(traces []CallTrace, nm callSiteLabeler) CallGraph {
 	})
 
 	return graph
+}
+
+//
+// Format a map as a GraphViz attribute list.
+//
+func dotAttrs(attrs map[string]interface{}) string {
+	fields := make([]string, len(attrs))
+
+	i := 0
+	for k, v := range attrs {
+		switch v.(type) {
+		case string:
+			v = fmt.Sprintf("\"%s\"", v)
+		}
+
+		fields[i] = fmt.Sprintf("\"%s\" = %v", k, v)
+		i++
+	}
+
+	return fmt.Sprintf("[ %s ]", strings.Join(fields, ", "))
 }
