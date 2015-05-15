@@ -65,15 +65,13 @@ func main() {
 	// Load the data (JSON- or gob-encoded):
 	//
 	var results soaap.Results
+	report("Loading data from " + input)
 
 	if strings.HasSuffix(input, ".gob") {
 		decoder := gob.NewDecoder(f)
 		err = decoder.Decode(&results)
 	} else {
-		results, err = soaap.ParseJSON(f, func(progress string) {
-			fmt.Println(progress)
-			os.Stdout.Sync()
-		})
+		results, err = soaap.ParseJSON(f, report)
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %s\n", err)
@@ -82,7 +80,7 @@ func main() {
 
 	graph := soaap.NewCallGraph()
 	for _, a := range analyses {
-		g, err := results.ExtractGraph(a)
+		g, err := results.ExtractGraph(a, report)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return
@@ -128,4 +126,9 @@ func printUsage() {
 
 	fmt.Fprintf(os.Stderr, "Options:\n")
 	flag.PrintDefaults()
+}
+
+func report(progress string) {
+	fmt.Println(progress)
+	os.Stdout.Sync()
 }

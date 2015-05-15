@@ -2,6 +2,7 @@ package soaap
 
 import "fmt"
 import "errors"
+import "math"
 import "strings"
 
 type CallGraph struct {
@@ -85,7 +86,7 @@ type Call struct {
 //
 // A function that extracts a CallGraph from SOAAP Results.
 //
-type graphFn func(results Results) CallGraph
+type graphFn func(results Results, progress func(string)) CallGraph
 
 var graphExtractors map[string]graphFn = map[string]graphFn{
 	"privaccess": PrivAccessGraph,
@@ -109,7 +110,7 @@ type callSiteLabeler func(CallSite) (string, GraphNode)
 //
 // Construct a callgraph from SOAAP's vulnerability analysis.
 //
-func VulnGraph(results Results) CallGraph {
+func VulnGraph(results Results, progress func(string)) CallGraph {
 	graph := NewCallGraph()
 
 	for _, v := range results.Vulnerabilities {
@@ -141,10 +142,16 @@ func VulnGraph(results Results) CallGraph {
 //
 // Construct a callgraph of sandbox-private data accesses outside of sandboxes.
 //
-func PrivAccessGraph(results Results) CallGraph {
+func PrivAccessGraph(results Results, progress func(string)) CallGraph {
 	graph := NewCallGraph()
+	accesses := results.PrivateAccess
+	total := len(accesses)
+	chunk := int(math.Ceil(math.Pow(10, math.Log10(float64(total)/500))))
 
-	for _, a := range results.PrivateAccess {
+	go progress(fmt.Sprintf("Processing %d private accesses", total))
+
+	count := 0
+	for _, a := range accesses {
 		trace := results.Traces[a.Trace]
 
 		fn := func(cs CallSite) (string, GraphNode) {
@@ -166,6 +173,13 @@ func PrivAccessGraph(results Results) CallGraph {
 		}
 
 		graph.Union(trace.graph(results.Traces, fn))
+
+		count++
+		if count%chunk == 0 {
+			go progress(
+				fmt.Sprintf("Processed %d/%d accesses",
+					count, total))
+		}
 	}
 
 	return graph

@@ -15,14 +15,14 @@ type Results struct {
 	Traces          []CallTrace  `json:"traces"`
 }
 
-func (r Results) ExtractGraph(analysis string) (CallGraph, error) {
+func (r Results) ExtractGraph(analysis string, progress func(string)) (CallGraph, error) {
 	fn, ok := graphExtractors[analysis]
 	if !ok {
 		return CallGraph{},
 			fmt.Errorf("unknown analysis: '%s'", analysis)
 	}
 
-	return fn(r), nil
+	return fn(r, progress), nil
 }
 
 //
