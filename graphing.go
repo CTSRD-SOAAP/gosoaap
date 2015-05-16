@@ -94,6 +94,7 @@ func (cg *CallGraph) Union(g CallGraph) error {
 type GraphNode struct {
 	Name        string
 	Description string
+	Location    SourceLocation
 
 	// A vulnerability (current or previous) is known at this location.
 	CVE []CVE
@@ -164,6 +165,7 @@ func (c Call) Dot(graph CallGraph, weight int) string {
 	callee := graph.Nodes[c.Callee]
 
 	attrs := map[string]interface{}{
+		"label":    caller.Location.String(),
 		"penwidth": weight,
 		"weight":   weight,
 	}
@@ -217,6 +219,7 @@ func VulnGraph(results Results, progress func(string)) CallGraph {
 			var node GraphNode
 			node.Name = cs.String() + "_" + v.Sandbox
 			node.Description = desc
+			node.Location = cs.Location
 			node.Sandbox = v.Sandbox
 
 			if top {
@@ -260,6 +263,7 @@ func PrivAccessGraph(results Results, progress func(string)) CallGraph {
 			var node GraphNode
 			node.Name = cs.String() + "_" + sandboxes
 			node.Description = desc
+			node.Location = cs.Location
 			node.Owners = a.Sandboxes
 
 			return key, node
