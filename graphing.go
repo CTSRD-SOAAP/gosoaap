@@ -169,7 +169,7 @@ func (c Call) Dot(graph CallGraph, weight int) string {
 	callee := graph.Nodes[c.Callee]
 
 	attrs := map[string]interface{}{
-		"label":    caller.Location.String(),
+		"label":    callee.Location.String(),
 		"penwidth": weight,
 		"weight":   weight,
 	}
