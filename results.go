@@ -52,9 +52,9 @@ func (r Results) Save(f *os.File) error {
 // Information that SOAAP reports about a vulnerability.
 //
 type Vuln struct {
-	Function   string
+	CallSite
+
 	Sandbox    string
-	Location   SourceLocation
 	Type       string
 	CVE        []CVE
 	Restricted bool `json:"restricted_rights"`
@@ -75,8 +75,8 @@ func (c CVE) String() string {
 // outside of the sandbox.
 //
 type PrivAccess struct {
-	Function  string
-	Location  SourceLocation
+	CallSite
+
 	Sandboxes []string `json:"sandbox_private"`
 	Trace     int
 	TraceName string `json:"trace_ref"`
