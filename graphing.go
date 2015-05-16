@@ -150,6 +150,13 @@ type GraphNode struct {
 	Tags map[string]bool
 }
 
+func newGraphNode(name string) GraphNode {
+	var node GraphNode
+	node.Name = name
+
+	return node
+}
+
 //
 // Construct a GraphViz Dot description of a GraphNode.
 //
@@ -254,7 +261,7 @@ func VulnGraph(results Results, progress func(string)) CallGraph {
 		trace := results.Traces[v.Trace]
 
 		fn := func(cs CallSite) GraphNode {
-			var node GraphNode
+			node := newGraphNode(cs.String() + v.Sandbox)
 			node.Name = cs.String() + v.Sandbox
 			node.Description = cs.Function
 			if v.Sandbox != "" {
@@ -295,8 +302,7 @@ func PrivAccessGraph(results Results, progress func(string)) CallGraph {
 		fn := func(cs CallSite) GraphNode {
 			sandboxes := strings.Join(a.Sandboxes, ",")
 
-			var node GraphNode
-			node.Name = cs.String() + sandboxes
+			node := newGraphNode(cs.String() + sandboxes)
 			node.Description = cs.Function
 			if sandboxes != "" {
 				node.Description += "\\n<<" + sandboxes + ">>"
