@@ -94,17 +94,17 @@ func (cg *CallGraph) Union(g CallGraph) error {
 type GraphNode struct {
 	Name        string
 	Description string
-	Tags        map[string]bool
-}
 
-// Construct a GraphNode.
-func Node(name string, desc string, tags []string) GraphNode {
-	node := GraphNode{name, desc, make(map[string]bool)}
-	for _, s := range tags {
-		node.Tags[s] = true
-	}
+	// A vulnerability (current or previous) is known at this location.
+	CVE []CVE
 
-	return node
+	// The name of this node's sandbox (or the empty string if unsandboxed).
+	Sandbox string
+
+	// The name of the sandbox(es) that own the data being accessed.
+	Owners []string
+
+	Tags map[string]bool
 }
 
 //
@@ -179,6 +179,7 @@ func VulnGraph(results Results, progress func(string)) CallGraph {
 
 	for _, v := range results.Vulnerabilities {
 		trace := results.Traces[v.Trace]
+		top := true
 
 		fn := func(cs CallSite) (string, GraphNode) {
 			key := cs.String() + " " + v.Sandbox
@@ -188,11 +189,15 @@ func VulnGraph(results Results, progress func(string)) CallGraph {
 				desc += "\\n<<" + v.Sandbox + ">>"
 			}
 
-			node := Node(
-				cs.String()+"_"+v.Sandbox,
-				desc,
-				[]string{},
-			)
+			var node GraphNode
+			node.Name = cs.String() + "_" + v.Sandbox
+			node.Description = desc
+			node.Sandbox = v.Sandbox
+
+			if top {
+				node.CVE = v.CVE
+				top = false
+			}
 
 			return key, node
 		}
@@ -227,11 +232,10 @@ func PrivAccessGraph(results Results, progress func(string)) CallGraph {
 				desc += "\\n<<" + sandboxes + ">>"
 			}
 
-			node := Node(
-				cs.String()+"_"+sandboxes,
-				desc,
-				[]string{},
-			)
+			var node GraphNode
+			node.Name = cs.String() + "_" + sandboxes
+			node.Description = desc
+			node.Owners = a.Sandboxes
 
 			return key, node
 		}
