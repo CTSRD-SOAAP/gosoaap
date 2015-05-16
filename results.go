@@ -66,6 +66,10 @@ type CVE struct {
 	ID string
 }
 
+func (c CVE) String() string {
+	return c.ID
+}
+
 //
 // Information SOAAP reports about access to a sandbox-private variable
 // outside of the sandbox.
