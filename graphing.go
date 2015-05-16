@@ -119,6 +119,10 @@ func (n GraphNode) Dot() string {
 		"style": "filled",
 	}
 
+	if len(n.CVE) > 0 {
+		attrs["label"] = fmt.Sprintf("%s\\n%s", n.CVE, n.Description)
+	}
+
 	switch true {
 	case len(n.CVE) > 0 && n.Sandbox != "":
 		// A vulnerability has been mitigated through sandboxing!
