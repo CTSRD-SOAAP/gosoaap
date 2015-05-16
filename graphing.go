@@ -42,6 +42,16 @@ func LoadGraph(f *os.File, report func(string)) (CallGraph, error) {
 func (cg *CallGraph) AddCall(caller string, callee string) {
 	cg.calls[Call{caller, callee}] += 1
 
+	// This idiom (copy, modify, update) is terribly tedious, but
+	// Go maps always return copies rather than references.
+	c := cg.nodes[caller]
+	c.Callees.Add(callee)
+	cg.nodes[caller] = c
+
+	c = cg.nodes[callee]
+	c.Callers.Add(caller)
+	cg.nodes[callee] = c
+
 	cg.roots.Remove(callee)
 	cg.leaves.Remove(caller)
 }
@@ -147,12 +157,17 @@ type GraphNode struct {
 	// The name of the sandbox(es) that own the data being accessed.
 	Owners []string
 
+	Callees strset
+	Callers strset
+
 	Tags map[string]bool
 }
 
 func newGraphNode(name string) GraphNode {
 	var node GraphNode
 	node.Name = name
+	node.Callees = make(strset)
+	node.Callers = make(strset)
 
 	return node
 }
