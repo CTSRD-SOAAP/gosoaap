@@ -212,7 +212,7 @@ func VulnGraph(results Results, progress func(string)) CallGraph {
 		trace := results.Traces[v.Trace]
 
 		fn := func(cs CallSite) (string, GraphNode) {
-			key := cs.String() + " " + v.Sandbox
+			key := cs.String() + v.Sandbox
 
 			desc := cs.Function
 			if v.Sandbox != "" {
@@ -220,7 +220,7 @@ func VulnGraph(results Results, progress func(string)) CallGraph {
 			}
 
 			var node GraphNode
-			node.Name = cs.String() + "_" + v.Sandbox
+			node.Name = key
 			node.Description = desc
 			node.Location = cs.Location
 			node.Sandbox = v.Sandbox
@@ -255,7 +255,7 @@ func PrivAccessGraph(results Results, progress func(string)) CallGraph {
 
 		fn := func(cs CallSite) (string, GraphNode) {
 			sandboxes := strings.Join(a.Sandboxes, ",")
-			key := cs.String() + " " + sandboxes
+			key := cs.String() + sandboxes
 
 			desc := cs.Function
 			if sandboxes != "" {
@@ -263,7 +263,7 @@ func PrivAccessGraph(results Results, progress func(string)) CallGraph {
 			}
 
 			var node GraphNode
-			node.Name = cs.String() + "_" + sandboxes
+			node.Name = key
 			node.Description = desc
 			node.Location = cs.Location
 
