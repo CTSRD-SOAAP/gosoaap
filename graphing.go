@@ -271,7 +271,7 @@ func VulnGraph(results Results, progress func(string)) CallGraph {
 		top.CVE = v.CVE
 		graph.AddNode(top)
 
-		graph.Union(trace.graph(top.Name, results.Traces, fn))
+		graph.Union(trace.graph(top, results.Traces, fn))
 	}
 
 	return graph
@@ -311,7 +311,7 @@ func PrivAccessGraph(results Results, progress func(string)) CallGraph {
 		top.Owners = a.Sandboxes
 		graph.AddNode(top)
 
-		graph.Union(trace.graph(top.Name, results.Traces, fn))
+		graph.Union(trace.graph(top, results.Traces, fn))
 
 		count++
 		if count%chunk == 0 {
@@ -329,9 +329,10 @@ func PrivAccessGraph(results Results, progress func(string)) CallGraph {
 // CallSite instances into graph nodes with identifiers, tags, etc.,
 // appropriate to the analysis we're performing.
 //
-func (t CallTrace) graph(top string, traces []CallTrace, nm nodeMaker) CallGraph {
+func (t CallTrace) graph(top GraphNode, traces []CallTrace, nm nodeMaker) CallGraph {
 	graph := NewCallGraph()
-	callee := top
+	graph.AddNode(top)
+	callee := top.Name
 
 	t.Foreach(traces, func(cs CallSite) {
 		node := nm(cs)
