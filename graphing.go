@@ -11,8 +11,8 @@ import (
 )
 
 type CallGraph struct {
-	Nodes map[string]GraphNode
-	Calls map[Call]int
+	nodes  map[string]GraphNode
+	calls  map[Call]int
 }
 
 //
@@ -36,7 +36,11 @@ func LoadGraph(f *os.File, report func(string)) (CallGraph, error) {
 }
 
 func (cg *CallGraph) AddCall(caller string, callee string) {
-	cg.Calls[Call{caller, callee}] += 1
+	cg.calls[Call{caller, callee}] += 1
+}
+
+func (cg *CallGraph) AddNode(node GraphNode) {
+	cg.nodes[node.Name] = node
 }
 
 //
@@ -54,10 +58,10 @@ func (cg *CallGraph) Simplify() {
 }
 
 func (cg *CallGraph) Union(g CallGraph) error {
-	for id, node := range g.Nodes {
+	for id, node := range g.nodes {
 		// If we already have a GraphNode with this identifier,
 		// merge the two descriptions and tag sets.
-		if n, have := cg.Nodes[id]; have {
+		if n, have := cg.nodes[id]; have {
 			if n.Name != node.Name {
 				return errors.New(fmt.Sprintf(
 					"Nodes in CallGraph union have"+
@@ -76,11 +80,11 @@ func (cg *CallGraph) Union(g CallGraph) error {
 			}
 		}
 
-		cg.Nodes[id] = node
+		cg.AddNode(node)
 	}
 
-	for call, count := range g.Calls {
-		cg.Calls[call] += count
+	for call, count := range g.calls {
+		cg.calls[call] += count
 	}
 
 	return nil
@@ -98,11 +102,11 @@ func (cg CallGraph) WriteDot(out io.Writer) {
 
 `)
 
-	for _, n := range cg.Nodes {
+	for _, n := range cg.nodes {
 		fmt.Fprintf(out, "	%s\n", n.Dot())
 	}
 
-	for c, count := range cg.Calls {
+	for c, count := range cg.calls {
 		fmt.Fprintf(out, "	%s\n", c.Dot(cg, count))
 	}
 
@@ -189,8 +193,8 @@ type Call struct {
 
 // Output GraphViz for a Call.
 func (c Call) Dot(graph CallGraph, weight int) string {
-	caller := graph.Nodes[c.Caller]
-	callee := graph.Nodes[c.Callee]
+	caller := graph.nodes[c.Caller]
+	callee := graph.nodes[c.Callee]
 
 	attrs := map[string]interface{}{
 		"label":    callee.Location.String(),
@@ -224,7 +228,7 @@ func GraphAnalyses() []string {
 	return keys
 }
 
-type callSiteLabeler func(CallSite) (string, GraphNode)
+type nodeMaker func(CallSite) GraphNode
 
 //
 // Construct a callgraph from SOAAP's vulnerability analysis.
@@ -235,28 +239,25 @@ func VulnGraph(results Results, progress func(string)) CallGraph {
 	for _, v := range results.Vulnerabilities {
 		trace := results.Traces[v.Trace]
 
-		fn := func(cs CallSite) (string, GraphNode) {
-			key := cs.String() + v.Sandbox
-
-			desc := cs.Function
+		fn := func(cs CallSite) GraphNode {
+			var node GraphNode
+			node.Name = cs.String() + v.Sandbox
+			node.Description = cs.Function
 			if v.Sandbox != "" {
-				desc += "\\n<<" + v.Sandbox + ">>"
+				node.Description += "\\n<<" + v.Sandbox + ">>"
 			}
 
-			var node GraphNode
-			node.Name = key
-			node.Description = desc
 			node.Location = cs.Location
 			node.Sandbox = v.Sandbox
 
-			return key, node
+			return node
 		}
 
-		id, top := fn(v.CallSite)
+		top := fn(v.CallSite)
 		top.CVE = v.CVE
-		graph.Nodes[id] = top
+		graph.AddNode(top)
 
-		graph.Union(trace.graph(id, results.Traces, fn))
+		graph.Union(trace.graph(top.Name, results.Traces, fn))
 	}
 
 	return graph
@@ -277,28 +278,26 @@ func PrivAccessGraph(results Results, progress func(string)) CallGraph {
 	for _, a := range accesses {
 		trace := results.Traces[a.Trace]
 
-		fn := func(cs CallSite) (string, GraphNode) {
+		fn := func(cs CallSite) GraphNode {
 			sandboxes := strings.Join(a.Sandboxes, ",")
-			key := cs.String() + sandboxes
-
-			desc := cs.Function
-			if sandboxes != "" {
-				desc += "\\n<<" + sandboxes + ">>"
-			}
 
 			var node GraphNode
-			node.Name = key
-			node.Description = desc
+			node.Name = cs.String() + sandboxes
+			node.Description = cs.Function
+			if sandboxes != "" {
+				node.Description += "\\n<<" + sandboxes + ">>"
+			}
+
 			node.Location = cs.Location
 
-			return key, node
+			return node
 		}
 
-		id, top := fn(a.CallSite)
+		top := fn(a.CallSite)
 		top.Owners = a.Sandboxes
-		graph.Nodes[id] = top
+		graph.AddNode(top)
 
-		graph.Union(trace.graph(id, results.Traces, fn))
+		graph.Union(trace.graph(top.Name, results.Traces, fn))
 
 		count++
 		if count%chunk == 0 {
@@ -312,19 +311,19 @@ func PrivAccessGraph(results Results, progress func(string)) CallGraph {
 }
 
 //
-// Graph a single CallTrace, using a callSiteLabeler function to convert
+// Graph a single CallTrace, using a nodeMaker function to convert
 // CallSite instances into graph nodes with identifiers, tags, etc.,
 // appropriate to the analysis we're performing.
 //
-func (t CallTrace) graph(top string, traces []CallTrace, nm callSiteLabeler) CallGraph {
+func (t CallTrace) graph(top string, traces []CallTrace, nm nodeMaker) CallGraph {
 	graph := NewCallGraph()
 	callee := top
 
 	t.Foreach(traces, func(cs CallSite) {
-		identifier, node := nm(cs)
-		graph.Nodes[identifier] = node
+		node := nm(cs)
+		graph.AddNode(node)
 
-		caller := identifier
+		caller := node.Name
 		graph.AddCall(caller, callee)
 		callee = caller
 	})
