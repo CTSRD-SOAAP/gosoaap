@@ -97,21 +97,8 @@ func main() {
 	//
 	if *binout {
 	} else {
-		writeDot(graph, out)
+		graph.WriteDot(out)
 	}
-}
-
-func dotHeader() string {
-	return `
-
-	node [ fontname = "Inconsolata" ];
-	edge [ fontname = "Avenir" ];
-
-	labeljust = "l";
-	labelloc = "b";
-	rankdir = "BT";
-
-`
 }
 
 func analyzeResultsFile(f *os.File, analyses []string) (soaap.CallGraph, error) {
@@ -147,19 +134,4 @@ func printUsage() {
 func report(progress string) {
 	fmt.Println(progress)
 	os.Stdout.Sync()
-}
-
-func writeDot(graph soaap.CallGraph, out *os.File) {
-	fmt.Fprintln(out, "digraph {")
-	fmt.Fprintln(out, dotHeader())
-
-	for _, n := range graph.Nodes {
-		fmt.Fprintf(out, "	%s\n", n.Dot())
-	}
-
-	for c, count := range graph.Calls {
-		fmt.Fprintf(out, "	%s\n", c.Dot(graph, count))
-	}
-
-	fmt.Fprintf(out, "}\n")
 }

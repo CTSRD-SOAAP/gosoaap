@@ -4,6 +4,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"strings"
@@ -83,6 +84,29 @@ func (cg *CallGraph) Union(g CallGraph) error {
 	}
 
 	return nil
+}
+
+func (cg CallGraph) WriteDot(out io.Writer) {
+	fmt.Fprintln(out, `digraph {
+
+	node [ fontname = "Inconsolata" ];
+	edge [ fontname = "Avenir" ];
+
+	labeljust = "l";
+	labelloc = "b";
+	rankdir = "BT";
+
+`)
+
+	for _, n := range cg.Nodes {
+		fmt.Fprintf(out, "	%s\n", n.Dot())
+	}
+
+	for c, count := range cg.Calls {
+		fmt.Fprintf(out, "	%s\n", c.Dot(cg, count))
+	}
+
+	fmt.Fprintf(out, "}\n")
 }
 
 //
