@@ -266,12 +266,12 @@ func PrivAccessGraph(results Results, progress func(string)) CallGraph {
 			node.Name = cs.String() + "_" + sandboxes
 			node.Description = desc
 			node.Location = cs.Location
-			node.Owners = a.Sandboxes
 
 			return key, node
 		}
 
 		id, top := fn(a.CallSite)
+		top.Owners = a.Sandboxes
 		graph.Nodes[id] = top
 
 		graph.Union(trace.graph(id, results.Traces, fn))
