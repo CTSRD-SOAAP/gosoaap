@@ -210,7 +210,6 @@ func VulnGraph(results Results, progress func(string)) CallGraph {
 
 	for _, v := range results.Vulnerabilities {
 		trace := results.Traces[v.Trace]
-		top := true
 
 		fn := func(cs CallSite) (string, GraphNode) {
 			key := cs.String() + " " + v.Sandbox
@@ -226,15 +225,14 @@ func VulnGraph(results Results, progress func(string)) CallGraph {
 			node.Location = cs.Location
 			node.Sandbox = v.Sandbox
 
-			if top {
-				node.CVE = v.CVE
-				top = false
-			}
-
 			return key, node
 		}
 
-		graph.Union(trace.graph(results.Traces, fn))
+		id, top := fn(v.CallSite)
+		top.CVE = v.CVE
+		graph.Nodes[id] = top
+
+		graph.Union(trace.graph(id, results.Traces, fn))
 	}
 
 	return graph
@@ -273,7 +271,10 @@ func PrivAccessGraph(results Results, progress func(string)) CallGraph {
 			return key, node
 		}
 
-		graph.Union(trace.graph(results.Traces, fn))
+		id, top := fn(a.CallSite)
+		graph.Nodes[id] = top
+
+		graph.Union(trace.graph(id, results.Traces, fn))
 
 		count++
 		if count%chunk == 0 {
@@ -291,20 +292,16 @@ func PrivAccessGraph(results Results, progress func(string)) CallGraph {
 // CallSite instances into graph nodes with identifiers, tags, etc.,
 // appropriate to the analysis we're performing.
 //
-func (t CallTrace) graph(traces []CallTrace, nm callSiteLabeler) CallGraph {
+func (t CallTrace) graph(top string, traces []CallTrace, nm callSiteLabeler) CallGraph {
 	graph := NewCallGraph()
-	var callee string
+	callee := top
 
 	t.Foreach(traces, func(cs CallSite) {
 		identifier, node := nm(cs)
 		graph.Nodes[identifier] = node
 
 		caller := identifier
-
-		if callee != "" {
-			graph.AddCall(caller, callee)
-		}
-
+		graph.AddCall(caller, callee)
 		callee = caller
 	})
 
