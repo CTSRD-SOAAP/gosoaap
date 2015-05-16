@@ -12,6 +12,8 @@ import (
 
 type CallGraph struct {
 	nodes  map[string]GraphNode
+	roots  strset
+	leaves strset
 	calls  map[Call]int
 }
 
@@ -21,6 +23,8 @@ type CallGraph struct {
 func NewCallGraph() CallGraph {
 	return CallGraph{
 		make(map[string]GraphNode),
+		make(strset),
+		make(strset),
 		make(map[Call]int),
 	}
 }
@@ -37,10 +41,17 @@ func LoadGraph(f *os.File, report func(string)) (CallGraph, error) {
 
 func (cg *CallGraph) AddCall(caller string, callee string) {
 	cg.calls[Call{caller, callee}] += 1
+
+	cg.roots.Remove(callee)
+	cg.leaves.Remove(caller)
 }
 
 func (cg *CallGraph) AddNode(node GraphNode) {
-	cg.nodes[node.Name] = node
+	name := node.Name
+
+	cg.nodes[name] = node
+	cg.roots.Add(name)
+	cg.leaves.Add(name)
 }
 
 //
@@ -78,13 +89,16 @@ func (cg *CallGraph) Union(g CallGraph) error {
 			for tag := range n.Tags {
 				node.Tags[tag] = true
 			}
-		}
 
-		cg.AddNode(node)
+			cg.nodes[id] = node
+		} else {
+			cg.AddNode(node)
+		}
 	}
 
 	for call, count := range g.calls {
-		cg.calls[call] += count
+		cg.AddCall(call.Caller, call.Callee)
+		cg.calls[call] += (count - 1)
 	}
 
 	return nil
