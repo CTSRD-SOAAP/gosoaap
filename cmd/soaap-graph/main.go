@@ -96,6 +96,10 @@ func main() {
 	// Output the results:
 	//
 	if *binout {
+		err = graph.Save(out)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error saving: %s\n", err)
+		}
 	} else {
 		graph.WriteDot(out)
 	}
