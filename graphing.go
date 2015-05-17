@@ -409,7 +409,7 @@ func (c Call) Dot(graph CallGraph, weight int) string {
 
 	attrs := map[string]interface{}{
 		"label":    callee.Location.String(),
-		"penwidth": weight,
+		"penwidth": 1 + math.Log(float64(weight)),
 		"weight":   weight,
 	}
 
