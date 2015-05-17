@@ -133,6 +133,13 @@ func (cg *CallGraph) Save(f *os.File) error {
 func (cg *CallGraph) Simplify() {
 }
 
+//
+// Report the size of the graph (number of nodes and number of edges).
+//
+func (cg CallGraph) Size() (int, int) {
+	return len(cg.nodes), len(cg.calls)
+}
+
 func (cg *CallGraph) Union(g CallGraph) error {
 	for id, node := range g.nodes {
 		// If we already have a GraphNode with this identifier,
