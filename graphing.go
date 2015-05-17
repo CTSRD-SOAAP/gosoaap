@@ -361,7 +361,7 @@ func PrivAccessGraph(results Results, progress func(string)) CallGraph {
 	graph := NewCallGraph()
 	accesses := results.PrivateAccess
 	total := len(accesses)
-	chunk := int(math.Ceil(math.Pow(10, math.Log10(float64(total)/500))))
+	chunk := int(math.Pow(10, math.Ceil(math.Log10(float64(total)/20))))
 
 	go progress(fmt.Sprintf("Processing %d private accesses", total))
 
