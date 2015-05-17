@@ -33,10 +33,27 @@ func NewCallGraph() CallGraph {
 // Load a CallGraph from a binary-encoded file.
 //
 func LoadGraph(f *os.File, report func(string)) (CallGraph, error) {
-	var graph CallGraph
-	err := gob.NewDecoder(f).Decode(&graph)
+	var cg CallGraph
 
-	return graph, err
+	dec := gob.NewDecoder(f)
+
+	if err := dec.Decode(&cg.nodes); err != nil {
+		return cg, err
+	}
+
+	if err := dec.Decode(&cg.roots); err != nil {
+		return cg, err
+	}
+
+	if err := dec.Decode(&cg.leaves); err != nil {
+		return cg, err
+	}
+
+	if err := dec.Decode(&cg.calls); err != nil {
+		return cg, err
+	}
+
+	return cg, nil
 }
 
 func (cg *CallGraph) AddCall(caller string, callee string) {
@@ -68,7 +85,25 @@ func (cg *CallGraph) AddNode(node GraphNode) {
 // Save a CallGraph to an os.File using a binary encoding.
 //
 func (cg *CallGraph) Save(f *os.File) error {
-	return gob.NewEncoder(f).Encode(cg)
+	enc := gob.NewEncoder(f)
+
+	if err := enc.Encode(cg.nodes); err != nil {
+		return err
+	}
+
+	if err := enc.Encode(cg.roots); err != nil {
+		return err
+	}
+
+	if err := enc.Encode(cg.leaves); err != nil {
+		return err
+	}
+
+	if err := enc.Encode(cg.calls); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 //
