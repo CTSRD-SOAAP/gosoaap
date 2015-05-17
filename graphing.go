@@ -186,7 +186,12 @@ func (cg *CallGraph) AddIntersecting(g CallGraph, depth int) error {
 // Compute the intersection of two CallGraphs, where the call traces leading to
 // any two leaf nodes must intersect within `depth` calls.
 //
-func (cg CallGraph) Intersect(g CallGraph, depth int) (CallGraph, error) {
+// If `keepBacktrace` is true, in addition to the intersecting nodes, the new
+// graph will also contain the full backtrace from each node to its root.
+//
+func (cg CallGraph) Intersect(g CallGraph, depth int,
+	keepBacktrace bool) (CallGraph, error) {
+
 	result := NewCallGraph()
 
 	// Collect our leaves and their ancestors (up to `depth` calls).
@@ -206,6 +211,14 @@ func (cg CallGraph) Intersect(g CallGraph, depth int) (CallGraph, error) {
 		for a := range nodes {
 			if ancestors.Contains(a) {
 				keep = keep.Union(nodes)
+
+				if keepBacktrace {
+					backtrace := g.CollectNodes(leaf,
+						getCallers, -1)
+
+					keep = keep.Union(backtrace)
+				}
+
 				break
 			}
 		}
@@ -231,6 +244,14 @@ func (cg CallGraph) Intersect(g CallGraph, depth int) (CallGraph, error) {
 		for a := range nodes {
 			if ancestors.Contains(a) {
 				keep = keep.Union(nodes)
+
+				if keepBacktrace {
+					backtrace := cg.CollectNodes(leaf,
+						getCallers, -1)
+
+					keep = keep.Union(backtrace)
+				}
+
 				break
 			}
 		}

@@ -137,7 +137,7 @@ func analyzeResultsFile(f *os.File, analyses []string) (soaap.CallGraph, error) 
 		case '^':
 			combineGraphs = func(g soaap.CallGraph) error {
 				graph, err = graph.Intersect(g,
-					*intersectionDepth)
+					*intersectionDepth, true)
 				return err
 			}
 			a = a[1:]

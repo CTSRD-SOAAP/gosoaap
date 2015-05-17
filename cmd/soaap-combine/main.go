@@ -63,7 +63,7 @@ func main() {
 			err = graph.AddIntersecting(g, *intersectionDepth)
 
 		case "intersection":
-			graph, err = graph.Intersect(g, *intersectionDepth)
+			graph, err = graph.Intersect(g, *intersectionDepth, true)
 
 		case "union":
 			err = graph.Union(g)
