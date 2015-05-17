@@ -81,6 +81,26 @@ func (cg *CallGraph) AddNode(node GraphNode) {
 	cg.leaves.Add(name)
 }
 
+func (cg *CallGraph) CollectNodes(root string,
+	selector func(GraphNode) strset, depth int) strset {
+
+	nodes := make(strset)
+	nodes.Add(root)
+
+	if depth == 0 {
+		return nodes
+	}
+
+	for id := range selector(cg.nodes[root]) {
+		nodes.Add(id)
+
+		children := cg.CollectNodes(id, selector, depth-1)
+		nodes = nodes.Union(children)
+	}
+
+	return nodes
+}
+
 //
 // Save a CallGraph to an os.File using a binary encoding.
 //
