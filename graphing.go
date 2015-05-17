@@ -140,6 +140,119 @@ func (cg CallGraph) Size() (int, int) {
 	return len(cg.nodes), len(cg.calls)
 }
 
+//
+// Add intersecting nodes to this graph, where the call traces leading to
+// any two leaf nodes must intersect within `depth` calls.
+//
+func (cg *CallGraph) AddIntersecting(g CallGraph, depth int) error {
+
+	// Collect our leaves and their ancestors (up to `depth` calls).
+	ancestors := make(strset)
+	getCallers := func(n GraphNode) strset { return n.Callers }
+
+	for id := range cg.leaves {
+		ancestors = ancestors.Union(
+			cg.CollectNodes(id, getCallers, depth))
+	}
+
+	// Keep those leaves with an ancestor common to the above.
+	keep := make(strset)
+
+	for leaf := range g.leaves {
+		nodes := g.CollectNodes(leaf, getCallers, depth)
+		for a := range nodes {
+			if ancestors.Contains(a) {
+				keep = keep.Union(nodes)
+				break
+			}
+		}
+	}
+
+	for id := range keep {
+		cg.AddNode(g.nodes[id])
+	}
+
+	for call, weight := range g.calls {
+		if keep.Contains(call.Caller) && keep.Contains(call.Callee) {
+			cg.AddCall(call.Caller, call.Callee)
+			cg.calls[call] += (weight - 1)
+		}
+	}
+
+	return nil
+}
+
+//
+// Compute the intersection of two CallGraphs, where the call traces leading to
+// any two leaf nodes must intersect within `depth` calls.
+//
+func (cg CallGraph) Intersect(g CallGraph, depth int) (CallGraph, error) {
+	result := NewCallGraph()
+
+	// Collect our leaves and their ancestors (up to `depth` calls).
+	ancestors := make(strset)
+	getCallers := func(n GraphNode) strset { return n.Callers }
+
+	for id := range cg.leaves {
+		ancestors = ancestors.Union(
+			cg.CollectNodes(id, getCallers, depth))
+	}
+
+	// Keep those leaves with an ancestor common to the above.
+	keep := make(strset)
+
+	for leaf := range g.leaves {
+		nodes := g.CollectNodes(leaf, getCallers, depth)
+		for a := range nodes {
+			if ancestors.Contains(a) {
+				keep = keep.Union(nodes)
+				break
+			}
+		}
+	}
+
+	for id := range keep {
+		result.AddNode(g.nodes[id])
+	}
+
+	for call, weight := range g.calls {
+		if keep.Contains(call.Caller) && keep.Contains(call.Callee) {
+			result.AddCall(call.Caller, call.Callee)
+			result.calls[call] += (weight - 1)
+		}
+	}
+
+	// Also filter out leaves from the LHS.
+	ancestors = keep
+	keep = make(strset)
+
+	for leaf := range cg.leaves {
+		nodes := cg.CollectNodes(leaf, getCallers, depth)
+		for a := range nodes {
+			if ancestors.Contains(a) {
+				keep = keep.Union(nodes)
+				break
+			}
+		}
+	}
+
+	for id := range keep {
+		result.AddNode(cg.nodes[id])
+	}
+
+	for call, weight := range cg.calls {
+		if keep.Contains(call.Caller) && keep.Contains(call.Callee) {
+			result.AddCall(call.Caller, call.Callee)
+			result.calls[call] += (weight - 1)
+		}
+	}
+
+	return result, nil
+}
+
+//
+// Compute the union of two CallGraphs.
+//
 func (cg *CallGraph) Union(g CallGraph) error {
 	for id, node := range g.nodes {
 		// If we already have a GraphNode with this identifier,

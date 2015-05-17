@@ -20,6 +20,12 @@ func (a Analyses) String() string {
 	return strings.Join(a, ", ")
 }
 
+var (
+	intersectionDepth = flag.Int("intersection-depth", 3,
+		"how many calls to trace back from a leaf node when looking"+
+			" for call graph intersections")
+)
+
 func main() {
 	//
 	// Command-line arguments:
@@ -116,12 +122,39 @@ func analyzeResultsFile(f *os.File, analyses []string) (soaap.CallGraph, error) 
 
 	graph := soaap.NewCallGraph()
 	for _, a := range analyses {
+		var combineGraphs func(soaap.CallGraph) error
+
+		switch a[0] {
+		case '+':
+			combineGraphs = graph.Union
+			a = a[1:]
+		case '.':
+			combineGraphs = func(g soaap.CallGraph) error {
+				return graph.AddIntersecting(g,
+					*intersectionDepth)
+			}
+			a = a[1:]
+		case '^':
+			combineGraphs = func(g soaap.CallGraph) error {
+				graph, err = graph.Intersect(g,
+					*intersectionDepth)
+				return err
+			}
+			a = a[1:]
+		default:
+			combineGraphs = graph.Union
+		}
+
+		if a[0] == '+' {
+
+		}
+
 		g, err := results.ExtractGraph(a, report)
 		if err != nil {
 			return graph, err
 		}
 
-		graph.Union(g)
+		err = combineGraphs(g)
 	}
 
 	return graph, err
