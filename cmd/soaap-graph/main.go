@@ -91,6 +91,9 @@ func main() {
 		return
 	}
 
+	nodes, edges := graph.Size()
+	fmt.Printf("Result: %d nodes and %d edges\n", nodes, edges)
+
 	//
 	// Apply any requested transformations:
 	//
@@ -120,39 +123,46 @@ func analyzeResultsFile(f *os.File, analyses []string) (soaap.CallGraph, error) 
 		return soaap.CallGraph{}, err
 	}
 
+	fmt.Println("Initializing empty call graph")
 	graph := soaap.NewCallGraph()
-	for _, a := range analyses {
-		var combineGraphs func(soaap.CallGraph) error
 
-		switch a[0] {
+	for _, analysis := range analyses {
+		var combineGraphs func(soaap.CallGraph) error
+		var description string
+
+		switch analysis[0] {
 		case '+':
+			description = "Adding"
 			combineGraphs = graph.Union
-			a = a[1:]
+			analysis = analysis[1:]
 		case '.':
+			description = "Adding intersection with"
 			combineGraphs = func(g soaap.CallGraph) error {
 				return graph.AddIntersecting(g,
 					*intersectionDepth)
 			}
-			a = a[1:]
+			analysis = analysis[1:]
 		case '^':
+			description = "Intersection with"
 			combineGraphs = func(g soaap.CallGraph) error {
 				graph, err = graph.Intersect(g,
 					*intersectionDepth, true)
 				return err
 			}
-			a = a[1:]
+			analysis = analysis[1:]
 		default:
+			description = "Adding"
 			combineGraphs = graph.Union
 		}
 
-		if a[0] == '+' {
-
-		}
-
-		g, err := results.ExtractGraph(a, report)
+		g, err := results.ExtractGraph(analysis, report)
 		if err != nil {
 			return graph, err
 		}
+
+		nodes, edges := g.Size()
+		report(fmt.Sprintf("%s '%s' analysis (%d nodes, %d edges)",
+			description, analysis, nodes, edges))
 
 		err = combineGraphs(g)
 	}
