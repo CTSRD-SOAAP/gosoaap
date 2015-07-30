@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/CTSRD-SOAAP/gosoaap"
+	"github.com/dustin/go-humanize"
 )
 
 func main() {
@@ -51,6 +52,15 @@ func main() {
 		return
 	}
 
+	fmt.Println("Loaded:")
+	fmt.Println(" -", human(len(results.Vulnerabilities)),
+		"past-vulnerability warnings")
+	fmt.Println(" -", human(len(results.PrivateAccess)),
+		"private data accesses")
+	fmt.Println(" -", human(len(results.Traces)),
+		"call graph traces")
+
+	//
 	// Encode it as a gob of data:
 	//
 	fmt.Print("Encoding...")
@@ -66,6 +76,17 @@ func printUsage() {
 
 	fmt.Fprintf(os.Stderr, "Options:\n")
 	flag.PrintDefaults()
+}
+
+//
+// Find a human-readable version of the size of a slice.
+//
+// Note that the argument had better be a slice, but the Go compiler is
+// incapable of checking this type requirement for us!
+// (see https://github.com/golang/go/wiki/InterfaceSlice for details)
+//
+func human(count int) string {
+	return humanize.SI(float64(count), "")
 }
 
 func reportProgress(message string) {
