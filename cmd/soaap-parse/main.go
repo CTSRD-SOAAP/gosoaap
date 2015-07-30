@@ -23,7 +23,7 @@ func main() {
 	input := flag.Args()[0]
 
 	//
-	// Load input file:
+	// Open input and output files:
 	//
 	f, err := os.Open(input)
 	if err != nil {
@@ -31,15 +31,6 @@ func main() {
 		return
 	}
 
-	results, err := soaap.LoadResults(f, reportProgress)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s\n", err)
-		return
-	}
-
-	//
-	// Open output file:
-	//
 	var outfile *os.File
 	if *output == "-" {
 		outfile = os.Stdout
@@ -52,6 +43,14 @@ func main() {
 	}
 
 	//
+	// Parse SOAAP results:
+	//
+	results, err := soaap.LoadResults(f, reportProgress)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		return
+	}
+
 	// Encode it as a gob of data:
 	//
 	fmt.Print("Encoding...")
