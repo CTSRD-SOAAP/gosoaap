@@ -87,7 +87,7 @@ func ParseJSON(f *os.File, progress func(string)) (Results, error) {
 		}
 	}
 
-	go progress("Done")
+	progress(fmt.Sprintf("Finished parsing %s.", f.Name()))
 
 	return soaap, nil
 }
