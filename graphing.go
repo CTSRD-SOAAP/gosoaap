@@ -356,7 +356,7 @@ type GraphNode struct {
 	Callees strset
 	Callers strset
 
-	Tags map[string]bool
+	Tags strset
 }
 
 func newGraphNode(name string) GraphNode {
@@ -364,6 +364,7 @@ func newGraphNode(name string) GraphNode {
 	node.Name = name
 	node.Callees = make(strset)
 	node.Callers = make(strset)
+	node.Tags = make(strset)
 
 	return node
 }
@@ -408,11 +409,6 @@ func (n GraphNode) Dot() string {
 	}
 
 	return fmt.Sprintf("\"%s\" %s;", n.Name, dotAttrs(attrs))
-}
-
-func (n GraphNode) HasTag(tag string) bool {
-	_, present := n.Tags[tag]
-	return present
 }
 
 type Call struct {
