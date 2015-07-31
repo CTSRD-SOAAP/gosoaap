@@ -89,6 +89,11 @@ func (cg *CallGraph) AddCall(call Call) {
 	cg.leaves.Remove(caller)
 }
 
+func (cg *CallGraph) AddCalls(call Call, weight int) {
+	cg.AddCall(call)
+	cg.calls[call] += weight - 1
+}
+
 func (cg *CallGraph) AddNode(node GraphNode) {
 	name := node.Name
 
@@ -277,8 +282,7 @@ func (cg *CallGraph) AddIntersecting(g CallGraph, depth int) error {
 
 	for call, weight := range g.calls {
 		if keep.Contains(call.Caller) && keep.Contains(call.Callee) {
-			cg.AddCall(call)
-			cg.calls[call] += (weight - 1)
+			cg.AddCalls(call, weight)
 		}
 	}
 
