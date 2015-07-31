@@ -148,5 +148,9 @@ type SourceLocation struct {
 }
 
 func (l SourceLocation) String() string {
+	if l.Line == 0 {
+		return ""
+	}
+
 	return fmt.Sprintf("%s:%d (%s)", l.File, l.Line, l.Library)
 }
