@@ -158,7 +158,73 @@ func (cg CallGraph) Save(f *os.File) error {
 // Simplify a CallGraph by collapsing call chains and dropping any
 // unreferenced calls.
 //
-func (cg *CallGraph) Simplify() {
+func (cg CallGraph) Simplified() CallGraph {
+	g := NewCallGraph()
+
+	for r := range cg.roots {
+		g.addSimplified(cg.nodes[r], cg.nodes)
+	}
+
+	return g
+}
+
+//
+// Recursively add simplified call chains to a CallGraph
+//
+func (cg *CallGraph) addSimplified(begin GraphNode, nodes map[string]GraphNode) {
+	cg.AddNode(begin)
+
+	length, end := walkChain(begin, nodes)
+
+	switch length {
+	case 0:
+		break
+
+	case 1:
+		cg.AddCall(begin.CallsOut[0])
+
+	default:
+		cg.AddCall(Call{
+			Caller:  begin.Name,
+			Callee:  end.Name,
+			Sandbox: begin.CallsOut[0].Sandbox,
+		})
+	}
+
+	cg.AddNode(end)
+
+	for _, call := range end.CallsOut {
+		cg.addSimplified(nodes[call.Callee], nodes)
+		cg.AddCall(call)
+	}
+}
+
+//
+// Traverse a linear chain of calls until we encounter an "interesting" node
+// (one with multiple callers, multiple callees or a CVE).
+//
+// Returns the number of calls traversed and the final node in the chain.
+//
+func walkChain(start GraphNode, nodes map[string]GraphNode) (int, GraphNode) {
+	traversed := 0
+	n := start
+
+	for {
+		if len(n.CallsIn) > 1 || len(n.CallsOut) != 1 || len(n.CVE) > 0 {
+			return traversed, n
+		}
+
+		for _, call := range n.CallsOut {
+			next := nodes[call.Callee]
+			if len(next.CVE) > 0 {
+				return traversed, n
+			}
+
+			n = next
+			traversed++
+		}
+	}
+	return traversed, n
 }
 
 //

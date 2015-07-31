@@ -98,7 +98,9 @@ func main() {
 	// Apply any requested transformations:
 	//
 	if *simplify {
-		graph.Simplify()
+		graph = graph.Simplified()
+		nodes, edges = graph.Size()
+		fmt.Printf("Simplified: %d nodes and %d edges\n", nodes, edges)
 	}
 
 	//
