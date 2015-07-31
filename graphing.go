@@ -174,26 +174,31 @@ func (cg CallGraph) Simplified() CallGraph {
 func (cg *CallGraph) addSimplified(begin GraphNode, nodes map[string]GraphNode) {
 	cg.AddNode(begin)
 
-	length, end := walkChain(begin, nodes)
+	callChain := walkChain(begin, nodes)
+	var next GraphNode
 
-	switch length {
-	case 0:
-		break
+	if len(callChain) == 0 {
+		next = begin
 
-	case 1:
-		cg.AddCall(begin.CallsOut[0])
+	} else {
+		lastCall := callChain[len(callChain)-1]
+		next = nodes[lastCall.Callee]
 
-	default:
-		cg.AddCall(Call{
-			Caller:  begin.Name,
-			Callee:  end.Name,
-			Sandbox: begin.CallsOut[0].Sandbox,
-		})
+		if len(callChain) == 1 {
+			cg.AddCall(lastCall)
+
+		} else {
+			cg.AddCall(Call{
+				Caller:  begin.Name,
+				Callee:  next.Name,
+				Sandbox: lastCall.Sandbox,
+			})
+		}
 	}
 
-	cg.AddNode(end)
+	cg.AddNode(next)
 
-	for _, call := range end.CallsOut {
+	for _, call := range next.CallsOut {
 		cg.addSimplified(nodes[call.Callee], nodes)
 		cg.AddCall(call)
 	}
@@ -205,26 +210,31 @@ func (cg *CallGraph) addSimplified(begin GraphNode, nodes map[string]GraphNode) 
 //
 // Returns the number of calls traversed and the final node in the chain.
 //
-func walkChain(start GraphNode, nodes map[string]GraphNode) (int, GraphNode) {
-	traversed := 0
+func walkChain(start GraphNode, nodes map[string]GraphNode) []Call {
+	chain := make([]Call, 0)
 	n := start
 
 	for {
 		if len(n.CallsIn) > 1 || len(n.CallsOut) != 1 || len(n.CVE) > 0 {
-			return traversed, n
+			return chain
 		}
 
-		for _, call := range n.CallsOut {
-			next := nodes[call.Callee]
-			if len(next.CVE) > 0 {
-				return traversed, n
-			}
-
-			n = next
-			traversed++
+		var call Call
+		for _, c := range n.CallsOut {
+			call = c
 		}
+
+		next := nodes[call.Callee]
+
+		if len(next.CVE) > 0 {
+			return chain
+		}
+
+		chain = append(chain, call)
+		n = next
 	}
-	return traversed, n
+
+	return chain
 }
 
 //
