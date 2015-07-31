@@ -1,5 +1,7 @@
 package soaap
 
+import "strings"
+
 //
 // A string set is a map from a string to an empty interface.
 //
@@ -18,6 +20,11 @@ func (s *strset) Add(key string) {
 func (s strset) Contains(key string) bool {
 	_, ok := s[key]
 	return ok
+}
+
+// Join all of the strings in this set together.
+func (s strset) Join(join string) string {
+	return strings.Join(s.Values(), join)
 }
 
 // Remove a string from a set and report whether or not it was actually there.
