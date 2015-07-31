@@ -1,6 +1,9 @@
 package soaap
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 //
 // A string set is a map from a string to an empty interface.
@@ -44,6 +47,17 @@ func (s strset) Intersection(other strset) strset {
 		if ok {
 			result[k] = true
 		}
+	}
+
+	return result
+}
+
+// Transform each key in the set according to a fmt.Sprintf format.
+func (s strset) TransformEach(format string) strset {
+	result := strset{}
+
+	for key := range s {
+		result.Add(fmt.Sprintf(format, key))
 	}
 
 	return result
