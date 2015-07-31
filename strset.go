@@ -53,3 +53,14 @@ func (s strset) Union(other strset) strset {
 
 	return result
 }
+
+// Extract all values contained in the set.
+func (s strset) Values() []string {
+	keys := make([]string, 0)
+
+	for key := range s {
+		keys = append(keys, key)
+	}
+
+	return keys
+}
