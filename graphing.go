@@ -167,7 +167,7 @@ func (cg CallGraph) Simplified() CallGraph {
 	g := NewCallGraph()
 
 	for r := range cg.roots {
-		g.addSimplified(cg.nodes[r], cg.nodes)
+		g.addSimplified(cg.nodes[r], cg)
 	}
 
 	return g
@@ -176,10 +176,10 @@ func (cg CallGraph) Simplified() CallGraph {
 //
 // Recursively add simplified call chains to a CallGraph
 //
-func (cg *CallGraph) addSimplified(begin GraphNode, nodes map[string]GraphNode) {
+func (cg *CallGraph) addSimplified(begin GraphNode, old CallGraph) {
 	cg.AddNode(begin)
 
-	callChain := walkChain(begin, nodes)
+	callChain := walkChain(begin, old.nodes)
 	var next GraphNode
 
 	if len(callChain) == 0 {
@@ -187,24 +187,31 @@ func (cg *CallGraph) addSimplified(begin GraphNode, nodes map[string]GraphNode) 
 
 	} else {
 		lastCall := callChain[len(callChain)-1]
-		next = nodes[lastCall.Callee]
+		next = old.nodes[lastCall.Callee]
 
 		if len(callChain) == 1 {
 			cg.AddCall(lastCall)
 
 		} else {
-			cg.AddCall(Call{
+			call := Call{
 				Caller:  begin.Name,
 				Callee:  next.Name,
 				Sandbox: lastCall.Sandbox,
-			})
+			}
+
+			weight := 0
+			for _, call := range callChain {
+				weight += old.calls[call]
+			}
+
+			cg.AddCalls(call, weight)
 		}
 	}
 
 	cg.AddNode(next)
 
 	for _, call := range next.CallsOut {
-		cg.addSimplified(nodes[call.Callee], nodes)
+		cg.addSimplified(old.nodes[call.Callee], old)
 		cg.AddCall(call)
 	}
 }
