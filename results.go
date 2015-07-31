@@ -62,6 +62,16 @@ type Vuln struct {
 	TraceName  string `json:"trace_ref"`
 }
 
+func (v Vuln) CVEs() strset {
+	cves := strset{}
+
+	for _, c := range v.CVE {
+		cves.Add(c.String())
+	}
+
+	return cves
+}
+
 type CVE struct {
 	ID string
 }
