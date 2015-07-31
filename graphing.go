@@ -421,6 +421,7 @@ func (cg *CallGraph) Union(g CallGraph) error {
 func (cg CallGraph) WriteDot(out io.Writer, groupBy string) error {
 	fmt.Fprintln(out, `digraph {
 
+	graph [ fontname = "Inconsolata" ];
 	node [ fontname = "Inconsolata" ];
 	edge [ fontname = "Avenir" ];
 
