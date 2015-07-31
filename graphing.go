@@ -400,11 +400,6 @@ func (cg *CallGraph) Union(g CallGraph) error {
 					id, n.Name, node.Name))
 			}
 
-			if n.Description != node.Description {
-				node.Description =
-					n.Description + "\\n" + node.Description
-			}
-
 			for tag := range n.Tags {
 				node.Tags[tag] = true
 			}
@@ -453,8 +448,10 @@ func (cg CallGraph) WriteDot(out io.Writer) {
 // an arbitrary name and description appropriate to a particular analysis.
 //
 type GraphNode struct {
-	Name        string
-	Description string
+	Name string
+
+	// The name of the function this node is in / represents.
+	Function string
 
 	// The sandbox that this code is being executed in.
 	//
@@ -474,9 +471,11 @@ type GraphNode struct {
 	Tags strset
 }
 
-func newGraphNode(name string) GraphNode {
+func newGraphNode(cs CallSite, sandbox string) GraphNode {
 	var node GraphNode
-	node.Name = name
+	node.Name = cs.Function + " : " + sandbox
+	node.Function = cs.Function
+	node.Sandbox = sandbox
 	node.CallsIn = make([]Call, 0)
 	node.CallsOut = make([]Call, 0)
 	node.Tags = make(strset)
@@ -498,7 +497,7 @@ func (n GraphNode) Callers() strset {
 // This applies SOAAP-specific styling depending on a node's tags.
 //
 func (n GraphNode) Dot() string {
-	label := n.Description
+	label := n.Function
 
 	if len(n.CVE) > 0 {
 		label += "\n" + n.CVE.TransformEach("[[%s]]").Join(" ")
@@ -613,11 +612,7 @@ func VulnGraph(results Results, progress func(string)) CallGraph {
 		trace := results.Traces[v.Trace]
 
 		fn := func(cs CallSite) GraphNode {
-			node := newGraphNode(cs.Function + " : " + v.Sandbox)
-			node.Description = cs.Function
-			node.Sandbox = v.Sandbox
-
-			return node
+			return newGraphNode(cs, v.Sandbox)
 		}
 
 		call := func(caller GraphNode, callee GraphNode,
@@ -660,11 +655,7 @@ func PrivAccessGraph(results Results, progress func(string)) CallGraph {
 		sandboxes := strings.Join(a.Sandboxes, ",")
 
 		fn := func(cs CallSite) GraphNode {
-			node := newGraphNode(cs.String() + " : " + sandboxes)
-			node.Description = cs.Function
-			node.Sandbox = sandboxes
-
-			return node
+			return newGraphNode(cs, sandboxes)
 		}
 
 		call := func(caller GraphNode, callee GraphNode, cs CallSite) Call {
