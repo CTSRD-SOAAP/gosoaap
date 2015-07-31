@@ -36,6 +36,8 @@ func main() {
 			strings.Join(soaap.GraphAnalyses(), ", ")+
 			")")
 
+	groupBy := flag.String("group-by", "", "group nodes by file, sandbox, etc.")
+
 	output := flag.String("output", "-", "output file")
 
 	binout := flag.Bool("binary", false, "write binary output")
@@ -109,7 +111,7 @@ func main() {
 	if *binout {
 		err = graph.Save(out)
 	} else {
-		err = graph.WriteDot(out)
+		err = graph.WriteDot(out, *groupBy)
 	}
 
 	if err != nil {

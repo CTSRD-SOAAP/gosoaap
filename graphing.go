@@ -418,7 +418,7 @@ func (cg *CallGraph) Union(g CallGraph) error {
 	return nil
 }
 
-func (cg CallGraph) WriteDot(out io.Writer) error {
+func (cg CallGraph) WriteDot(out io.Writer, groupBy string) error {
 	fmt.Fprintln(out, `digraph {
 
 	node [ fontname = "Inconsolata" ];
@@ -430,8 +430,64 @@ func (cg CallGraph) WriteDot(out io.Writer) error {
 
 `)
 
-	for _, n := range cg.nodes {
-		fmt.Fprintf(out, "	%s\n", n.Dot())
+	ungrouped := make([]string, 0)
+
+	if groupBy == "" {
+		for name := range cg.nodes {
+			ungrouped = append(ungrouped, name)
+		}
+
+	} else {
+		nodeGroups := make(map[string][]string)
+
+		for _, n := range cg.nodes {
+			var groupName string
+
+			switch groupBy {
+			case "function":
+				groupName = n.Function
+
+			case "namespace":
+				functionName := strings.Split(n.Function, "(")[0]
+
+				components := strings.Split(functionName, "::")
+				if len(components) <= 1 {
+					groupName = ""
+				} else {
+					groupName = strings.Join(components[:len(components)-1], "::")
+					n.Function = n.Function[len(groupName)+2:]
+					cg.nodes[n.Name] = n
+				}
+
+			case "sandbox":
+				groupName = n.Sandbox
+
+			default:
+				return fmt.Errorf("unknown grouping strategy '%s'", groupBy)
+			}
+
+			if groupName != "" {
+				nodeGroups[groupName] = append(nodeGroups[groupName], n.Name)
+			} else {
+				ungrouped = append(ungrouped, n.Name)
+			}
+		}
+
+		for name, nodes := range nodeGroups {
+			fmt.Fprintf(out, "	subgraph \"cluster_%s\" {\n", name)
+			fmt.Fprintf(out, "		graph [ bgcolor = \"#dddddd66\" ];\n")
+			fmt.Fprintf(out, "		label = \"%s\";\n", name)
+
+			for _, n := range nodes {
+				fmt.Fprintf(out, "		%s\n", cg.nodes[n].Dot())
+			}
+
+			fmt.Fprintf(out, "	}\n\n")
+		}
+	}
+
+	for _, n := range ungrouped {
+		fmt.Fprintf(out, "	%s\n", cg.nodes[n].Dot())
 	}
 
 	for c, count := range cg.calls {
