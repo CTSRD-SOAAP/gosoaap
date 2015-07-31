@@ -456,6 +456,12 @@ type GraphNode struct {
 	Name        string
 	Description string
 
+	// The sandbox that this code is being executed in.
+	//
+	// Note that SOAAP can discriminate among the same function executing
+	// in different sandboxes.
+	Sandbox string
+
 	// A vulnerability (current or previous) is known at this location.
 	CVE strset
 
@@ -492,22 +498,26 @@ func (n GraphNode) Callers() strset {
 // This applies SOAAP-specific styling depending on a node's tags.
 //
 func (n GraphNode) Dot() string {
+	label := n.Description
+
+	if len(n.CVE) > 0 {
+		label += "\n" + n.CVE.TransformEach("[[%s]]").Join(" ")
+	}
+
+	if n.Sandbox != "" {
+		label += "\n<<" + n.Sandbox + ">>"
+	}
+
 	attrs := map[string]interface{}{
-		"label": n.Name + "\n" + n.CVE.Join(", "), //n.Description,
+		"label": label,
 		"style": "filled",
 	}
 
-	if len(n.CVE) > 0 {
-		//attrs["label"] = fmt.Sprintf("%s\\n%s", n.CVE, n.Description)
-	}
-
 	switch true {
-	/*
-		case len(n.CVE) > 0 && n.Sandbox != "":
-			// A vulnerability has been mitigated through sandboxing!
-			attrs["fillcolor"] = "#ffff66cc"
-			attrs["shape"] = "octagon"
-	*/
+	case len(n.CVE) > 0 && n.Sandbox != "":
+		// A vulnerability has been mitigated through sandboxing!
+		attrs["fillcolor"] = "#ffff66cc"
+		attrs["shape"] = "octagon"
 
 	case len(n.CVE) > 0:
 		// A vulnerability exists/existed outside a sandbox.
@@ -519,9 +529,9 @@ func (n GraphNode) Dot() string {
 		attrs["fillcolor"] = "#ff99cccc"
 		attrs["shape"] = "invhouse"
 
-	//case n.Sandbox != "":
-	//	attrs["fillcolor"] = "#99ff9999"
-	//	attrs["style"] = "dashed,filled"
+	case n.Sandbox != "":
+		attrs["fillcolor"] = "#99ff9999"
+		attrs["style"] = "dashed,filled"
 
 	default:
 		attrs["fillcolor"] = "#cccccccc"
@@ -603,9 +613,9 @@ func VulnGraph(results Results, progress func(string)) CallGraph {
 		trace := results.Traces[v.Trace]
 
 		fn := func(cs CallSite) GraphNode {
-			node := newGraphNode(cs.Function)
-			//node.Name += cs.String() + v.Sandbox
+			node := newGraphNode(cs.Function + " : " + v.Sandbox)
 			node.Description = cs.Function
+			node.Sandbox = v.Sandbox
 
 			return node
 		}
@@ -647,15 +657,12 @@ func PrivAccessGraph(results Results, progress func(string)) CallGraph {
 	count := 0
 	for _, a := range accesses {
 		trace := results.Traces[a.Trace]
+		sandboxes := strings.Join(a.Sandboxes, ",")
 
 		fn := func(cs CallSite) GraphNode {
-			sandboxes := strings.Join(a.Sandboxes, ",")
-
-			node := newGraphNode(cs.String() + sandboxes)
+			node := newGraphNode(cs.String() + " : " + sandboxes)
 			node.Description = cs.Function
-			if sandboxes != "" {
-				node.Description += "\\n<<" + sandboxes + ">>"
-			}
+			node.Sandbox = sandboxes
 
 			return node
 		}
