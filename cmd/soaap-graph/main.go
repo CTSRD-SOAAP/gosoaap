@@ -108,11 +108,13 @@ func main() {
 	//
 	if *binout {
 		err = graph.Save(out)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error saving: %s\n", err)
-		}
 	} else {
-		graph.WriteDot(out)
+		err = graph.WriteDot(out)
+	}
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error writing output: %s\n", err)
+		os.Exit(1)
 	}
 }
 

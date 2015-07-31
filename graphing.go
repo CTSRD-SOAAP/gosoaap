@@ -418,7 +418,7 @@ func (cg *CallGraph) Union(g CallGraph) error {
 	return nil
 }
 
-func (cg CallGraph) WriteDot(out io.Writer) {
+func (cg CallGraph) WriteDot(out io.Writer) error {
 	fmt.Fprintln(out, `digraph {
 
 	node [ fontname = "Inconsolata" ];
@@ -439,6 +439,8 @@ func (cg CallGraph) WriteDot(out io.Writer) {
 	}
 
 	fmt.Fprintf(out, "}\n")
+
+	return nil
 }
 
 //
