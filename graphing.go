@@ -639,7 +639,7 @@ func (c Call) Dot(graph CallGraph, weight int) string {
 //
 // A function that extracts a CallGraph from SOAAP Results.
 //
-type graphFn func(results Results, progress func(string)) CallGraph
+type graphFn func(results Results, progress func(string)) (CallGraph, error)
 
 var graphExtractors map[string]graphFn = map[string]graphFn{
 	"privaccess": PrivAccessGraph,
@@ -664,7 +664,7 @@ type nodeMaker func(CallSite) GraphNode
 //
 // Construct a callgraph from SOAAP's vulnerability analysis.
 //
-func VulnGraph(results Results, progress func(string)) CallGraph {
+func VulnGraph(results Results, progress func(string)) (CallGraph, error) {
 	graph := NewCallGraph()
 
 	for _, v := range results.Vulnerabilities {
@@ -688,16 +688,21 @@ func VulnGraph(results Results, progress func(string)) CallGraph {
 		top.CVE = v.CVEs()
 		graph.AddNode(top)
 
-		graph.Union(trace.graph(top, results.Traces, fn, call))
+		g, err := trace.graph(top, results.Traces, fn, call)
+		if err != nil {
+			return CallGraph{}, err
+		}
+
+		graph.Union(g)
 	}
 
-	return graph
+	return graph, nil
 }
 
 //
 // Construct a callgraph of sandbox-private data accesses outside of sandboxes.
 //
-func PrivAccessGraph(results Results, progress func(string)) CallGraph {
+func PrivAccessGraph(results Results, progress func(string)) (CallGraph, error) {
 	graph := NewCallGraph()
 	accesses := results.PrivateAccess
 	total := len(accesses)
@@ -729,7 +734,12 @@ func PrivAccessGraph(results Results, progress func(string)) CallGraph {
 		top.Owners = a.Sandboxes
 		graph.AddNode(top)
 
-		graph.Union(trace.graph(top, results.Traces, fn, call))
+		g, err := trace.graph(top, results.Traces, fn, call)
+		if err != nil {
+			return CallGraph{}, err
+		}
+
+		graph.Union(g)
 
 		count++
 		if count%chunk == 0 {
@@ -739,7 +749,7 @@ func PrivAccessGraph(results Results, progress func(string)) CallGraph {
 		}
 	}
 
-	return graph
+	return graph, nil
 }
 
 //
@@ -748,12 +758,12 @@ func PrivAccessGraph(results Results, progress func(string)) CallGraph {
 // appropriate to the analysis we're performing.
 //
 func (t CallTrace) graph(top GraphNode, traces []CallTrace,
-	makeNode nodeMaker, makeCall callMaker) CallGraph {
+	makeNode nodeMaker, makeCall callMaker) (CallGraph, error) {
 	graph := NewCallGraph()
 	graph.AddNode(top)
 	callee := top
 
-	t.Foreach(traces, func(cs CallSite) {
+	err := t.Foreach(traces, func(cs CallSite) {
 		caller := makeNode(cs)
 		graph.AddNode(caller)
 
@@ -761,7 +771,7 @@ func (t CallTrace) graph(top GraphNode, traces []CallTrace,
 		callee = caller
 	})
 
-	return graph
+	return graph, err
 }
 
 //

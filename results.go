@@ -41,7 +41,7 @@ func (r Results) ExtractGraph(analysis string, progress func(string)) (CallGraph
 			fmt.Errorf("unknown analysis: '%s'", analysis)
 	}
 
-	return fn(r, progress), nil
+	return fn(r, progress)
 }
 
 func (r Results) Save(f *os.File) error {
@@ -113,14 +113,23 @@ type CallTrace struct {
 // trace.Foreach(traces, func(cs CallSite) { fmt.Println(cs.Function) })
 // ```
 //
-func (t CallTrace) Foreach(traces []CallTrace, fn func(CallSite)) {
+func (t CallTrace) Foreach(traces []CallTrace, fn func(CallSite)) error {
 	for _, cs := range t.CallSites {
-		fn(cs)
+		if cs.Location.File != "" {
+			fn(cs)
+		}
 	}
 
 	if t.Next >= 0 {
+		if t.Next >= len(traces) {
+			return fmt.Errorf("trace ID (%d) out of range (have %d traces)",
+				t.Next, len(traces))
+		}
+
 		traces[t.Next].Foreach(traces, fn)
 	}
+
+	return nil
 }
 
 //
