@@ -102,8 +102,14 @@ func (cg *CallGraph) AddNode(node GraphNode) {
 	}
 
 	cg.nodes[name] = node
-	cg.roots.Add(name)
-	cg.leaves.Add(name)
+
+	if len(node.CallsIn) == 0 {
+		cg.roots.Add(name)
+	}
+
+	if len(node.CallsOut) == 0 {
+		cg.leaves.Add(name)
+	}
 }
 
 func (cg *CallGraph) CollectNodes(root string,
