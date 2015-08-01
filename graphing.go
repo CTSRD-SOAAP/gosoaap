@@ -78,11 +78,11 @@ func (cg *CallGraph) AddCall(call Call) {
 	// This idiom (copy, modify, update) is terribly tedious, but
 	// Go maps always return copies rather than references.
 	c := cg.nodes[caller]
-	c.CallsOut = append(c.CallsOut, call)
+	UpdateCalls(&c.CallsOut, call)
 	cg.nodes[caller] = c
 
 	c = cg.nodes[callee]
-	c.CallsIn = append(c.CallsIn, call)
+	UpdateCalls(&c.CallsIn, call)
 	cg.nodes[callee] = c
 
 	cg.roots.Remove(callee)
@@ -96,6 +96,10 @@ func (cg *CallGraph) AddCalls(call Call, weight int) {
 
 func (cg *CallGraph) AddNode(node GraphNode) {
 	name := node.Name
+
+	if n, ok := cg.nodes[name]; ok {
+		node.Update(n)
+	}
 
 	cg.nodes[name] = node
 	cg.roots.Add(name)
@@ -596,6 +600,31 @@ func (n GraphNode) Dot() string {
 	}
 
 	return fmt.Sprintf("\"%s\" %s;", n.Name, dotAttrs(attrs))
+}
+
+func (n *GraphNode) Update(g GraphNode) {
+	UpdateCalls(&n.CallsIn, g.CallsIn...)
+	UpdateCalls(&n.CallsOut, g.CallsOut...)
+	n.CVE.Union(g.CVE)
+	n.Tags.Union(g.Tags)
+}
+
+func UpdateCalls(current *[]Call, calls ...Call) {
+	// This is O(n x m), but n and m are typically very small...
+	for _, c := range calls {
+		alreadyHave := false
+
+		for _, existing := range *current {
+			if existing == c {
+				alreadyHave = true
+				break
+			}
+		}
+
+		if !alreadyHave {
+			*current = append(*current, c)
+		}
+	}
 }
 
 type Call struct {
