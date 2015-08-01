@@ -198,6 +198,7 @@ func (cg *CallGraph) addSimplified(begin GraphNode, old CallGraph) {
 	} else {
 		lastCall := callChain[len(callChain)-1]
 		next = old.nodes[lastCall.Callee]
+		cg.AddNode(next)
 
 		if len(callChain) == 1 {
 			cg.AddCall(lastCall)
@@ -217,8 +218,6 @@ func (cg *CallGraph) addSimplified(begin GraphNode, old CallGraph) {
 			cg.AddCalls(call, weight)
 		}
 	}
-
-	cg.AddNode(next)
 
 	for _, call := range next.CallsOut {
 		cg.addSimplified(old.nodes[call.Callee], old)
