@@ -171,6 +171,9 @@ func analyzeResultsFile(f *os.File, analyses []string) (soaap.CallGraph, error) 
 			description, analysis, nodes, edges))
 
 		err = combineGraphs(g)
+		if err != nil {
+			break
+		}
 	}
 
 	return graph, err
