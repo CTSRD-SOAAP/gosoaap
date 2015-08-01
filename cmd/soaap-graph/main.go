@@ -141,21 +141,28 @@ func analyzeResultsFile(f *os.File, analyses []string) (soaap.CallGraph, error) 
 			description = "Adding"
 			combineGraphs = graph.Union
 			analysis = analysis[1:]
+
 		case '.':
-			description = "Adding intersection with"
+			description = fmt.Sprintf("Adding intersection (depth %d) with",
+				intersectionDepth)
+
 			combineGraphs = func(g soaap.CallGraph) error {
 				return graph.AddIntersecting(g,
 					*intersectionDepth)
 			}
 			analysis = analysis[1:]
+
 		case '^':
-			description = "Intersection with"
+			description = fmt.Sprintf("Intersecting (depth %d) with",
+				intersectionDepth)
+
 			combineGraphs = func(g soaap.CallGraph) error {
 				graph, err = graph.Intersect(g,
 					*intersectionDepth, true)
 				return err
 			}
 			analysis = analysis[1:]
+
 		default:
 			description = "Adding"
 			combineGraphs = graph.Union
