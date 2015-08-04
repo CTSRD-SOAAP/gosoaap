@@ -574,6 +574,24 @@ func (n GraphNode) Callers() strset {
 func (n GraphNode) Dot() string {
 	label := n.Function
 
+	if len(label) > 30 {
+		function := strings.Split(n.Function, "(")[0]
+		if len(function) == len(n.Function) {
+			panic(fmt.Errorf("foo: '%s' '%s'", function, n.Function))
+		}
+		parameters := n.Function[len(function)+1 : len(n.Function)-1]
+
+		plen := 28 - len(function)
+		if plen < 0 {
+			plen = 0
+		} else if plen > len(parameters) {
+			plen = len(parameters)
+		}
+		parameters = parameters[:plen]
+
+		label = fmt.Sprintf("%s(%s [...])", function, parameters)
+	}
+
 	if len(n.CVE) > 0 {
 		label += "\n" + n.CVE.TransformEach("[[%s]]").Join(" ")
 	}
