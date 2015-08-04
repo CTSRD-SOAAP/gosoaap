@@ -574,6 +574,35 @@ func (n GraphNode) Callers() strset {
 func (n GraphNode) Dot() string {
 	label := n.Function
 
+	// Trim long node names
+	if len(label) > 30 {
+		//
+		// Split node name into <function>(<parameters>) - if applicable.
+		// Some node names don't have parameters (e.g., those that c++filt
+		// failed to demangle for some reason).
+		//
+		function := strings.Split(n.Function, "(")[0]
+
+		if len(function) == len(n.Function) {
+			// There are no parameters: perhaps demangling failed?
+			label = n.Function[:30] + " [...]"
+
+		} else {
+			//
+			parameters := n.Function[len(function)+1 : len(n.Function)-1]
+
+			plen := 28 - len(function)
+			if plen < 0 {
+				plen = 0
+			} else if plen > len(parameters) {
+				plen = len(parameters)
+			}
+			parameters = parameters[:plen]
+
+			label = fmt.Sprintf("%s(%s [...])", function, parameters)
+		}
+	}
+
 	if len(n.CVE) > 0 {
 		label += "\n" + n.CVE.TransformEach("[[%s]]").Join(" ")
 	}
