@@ -457,6 +457,9 @@ func (cg CallGraph) WriteDot(out io.Writer, groupBy string) error {
 			case "function":
 				groupName = n.Function
 
+			case "library":
+				groupName = n.Library
+
 			case "namespace":
 				functionName := strings.Split(n.Function, "(")[0]
 
@@ -521,6 +524,9 @@ type GraphNode struct {
 	// The name of the function this node is in / represents.
 	Function string
 
+	// The library that the function is defined in.
+	Library string
+
 	// The sandbox that this code is being executed in.
 	//
 	// Note that SOAAP can discriminate among the same function executing
@@ -543,6 +549,7 @@ func newGraphNode(cs CallSite, sandbox string) GraphNode {
 	var node GraphNode
 	node.Name = cs.Function + " : " + sandbox
 	node.Function = cs.Function
+	node.Library = cs.Location.Library
 	node.Sandbox = sandbox
 	node.CallsIn = make([]Call, 0)
 	node.CallsOut = make([]Call, 0)
@@ -608,6 +615,10 @@ func (n GraphNode) Dot() string {
 }
 
 func (n *GraphNode) Update(g GraphNode) {
+	if n.Library == "" {
+		n.Library = g.Library
+	}
+
 	UpdateCalls(&n.CallsIn, g.CallsIn...)
 	UpdateCalls(&n.CallsOut, g.CallsOut...)
 	n.CVE.Union(g.CVE)
