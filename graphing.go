@@ -652,6 +652,7 @@ func (n *GraphNode) Update(g GraphNode) {
 	UpdateCalls(&n.CallsIn, g.CallsIn...)
 	UpdateCalls(&n.CallsOut, g.CallsOut...)
 	n.CVE.Union(g.CVE)
+	n.Owners.Union(g.Owners)
 	n.Tags.Union(g.Tags)
 }
 
