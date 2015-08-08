@@ -41,7 +41,16 @@ func ParseJSON(f *os.File, progress func(string)) (Results, error) {
 		case "access_origin_warning":
 			// TODO
 
+		case "cap_rights_warning":
+			// TODO
+
 		case "classified_warning":
+			// TODO
+
+		case "global_access_warning":
+			// TODO
+
+		case "global_lost_update":
 			// TODO
 
 		case "private_access":
@@ -56,6 +65,15 @@ func ParseJSON(f *os.File, progress func(string)) (Results, error) {
 			}
 
 		case "private_leak":
+			// TODO
+
+		case "privileged_call":
+			// TODO
+
+		case "sandboxed_func":
+			// TODO
+
+		case "syscall_warning":
 			// TODO
 
 		case "vulnerability_warning":
