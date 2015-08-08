@@ -81,7 +81,7 @@ func (c CVE) String() string {
 }
 
 //
-// Information SOAAP reports about access to a sandbox-private variable
+// Information SOAAP reports about access to sandbox-private data
 // outside of the sandbox.
 //
 type PrivAccess struct {
@@ -92,7 +92,7 @@ type PrivAccess struct {
 	TraceName string `json:"trace_ref"`
 }
 
-func (p PrivAccess) SandboxNames() strset {
+func (p PrivAccess) DataOwners() strset {
 	sandboxes := strset{}
 
 	for _, s := range p.Sandboxes {

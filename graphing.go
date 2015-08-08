@@ -773,7 +773,7 @@ func PrivAccessGraph(results Results, progress func(string)) (CallGraph, error) 
 	count := 0
 	for _, a := range accesses {
 		trace := results.Traces[a.Trace]
-		sandboxes := a.SandboxNames().Join(",")
+		sandboxes := a.DataOwners().Join(",")
 
 		fn := func(cs CallSite) GraphNode {
 			return newGraphNode(cs, sandboxes)
@@ -788,7 +788,7 @@ func PrivAccessGraph(results Results, progress func(string)) (CallGraph, error) 
 		}
 
 		top := fn(a.CallSite)
-		top.Owners = a.SandboxNames()
+		top.Owners = a.DataOwners()
 		graph.AddNode(top)
 
 		g, err := trace.graph(top, results.Traces, fn, call)
