@@ -532,6 +532,7 @@ func newGraphNode(cs CallSite, sandbox string) GraphNode {
 	node.Function = cs.Function
 	node.Library = cs.Location.Library
 	node.Sandbox = sandbox
+	node.CVE = make(strset)
 	node.Owners = make(strset)
 	node.CallsIn = make([]Call, 0)
 	node.CallsOut = make([]Call, 0)
