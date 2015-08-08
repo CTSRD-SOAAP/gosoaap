@@ -2,7 +2,6 @@ package soaap
 
 import (
 	"encoding/gob"
-	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -397,26 +396,8 @@ func (cg CallGraph) Intersect(g CallGraph, depth int,
 // Compute the union of two CallGraphs.
 //
 func (cg *CallGraph) Union(g CallGraph) error {
-	for id, node := range g.nodes {
-		// If we already have a GraphNode with this identifier,
-		// merge the two descriptions and tag sets.
-		if n, have := cg.nodes[id]; have {
-			if n.Name != node.Name {
-				return errors.New(fmt.Sprintf(
-					"Nodes in CallGraph union have"+
-						" same identifier ('%s') but"+
-						" different names ('%s' vs '%s')",
-					id, n.Name, node.Name))
-			}
-
-			for tag := range n.Tags {
-				node.Tags[tag] = true
-			}
-
-			cg.nodes[id] = node
-		} else {
-			cg.AddNode(node)
-		}
+	for _, node := range g.nodes {
+		cg.AddNode(node)
 	}
 
 	for call, count := range g.calls {
