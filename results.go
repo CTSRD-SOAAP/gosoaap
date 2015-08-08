@@ -87,9 +87,23 @@ func (c CVE) String() string {
 type PrivAccess struct {
 	CallSite
 
-	Sandboxes []string `json:"sandbox_private"`
+	Sandboxes []SandboxName `json:"sandbox_private"`
 	Trace     int
 	TraceName string `json:"trace_ref"`
+}
+
+func (p PrivAccess) SandboxNames() strset {
+	sandboxes := strset{}
+
+	for _, s := range p.Sandboxes {
+		sandboxes.Add(s.Name)
+	}
+
+	return sandboxes
+}
+
+type SandboxName struct {
+	Name string
 }
 
 //

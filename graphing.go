@@ -537,7 +537,7 @@ type GraphNode struct {
 	CVE strset
 
 	// The name of the sandbox(es) that own the data being accessed.
-	Owners []string
+	Owners strset
 
 	CallsIn  []Call
 	CallsOut []Call
@@ -551,6 +551,7 @@ func newGraphNode(cs CallSite, sandbox string) GraphNode {
 	node.Function = cs.Function
 	node.Library = cs.Location.Library
 	node.Sandbox = sandbox
+	node.Owners = make(strset)
 	node.CallsIn = make([]Call, 0)
 	node.CallsOut = make([]Call, 0)
 	node.Tags = make(strset)
@@ -790,7 +791,7 @@ func PrivAccessGraph(results Results, progress func(string)) (CallGraph, error) 
 	count := 0
 	for _, a := range accesses {
 		trace := results.Traces[a.Trace]
-		sandboxes := strings.Join(a.Sandboxes, ",")
+		sandboxes := a.SandboxNames().Join(",")
 
 		fn := func(cs CallSite) GraphNode {
 			return newGraphNode(cs, sandboxes)
@@ -805,7 +806,7 @@ func PrivAccessGraph(results Results, progress func(string)) (CallGraph, error) 
 		}
 
 		top := fn(a.CallSite)
-		top.Owners = a.Sandboxes
+		top.Owners = a.SandboxNames()
 		graph.AddNode(top)
 
 		g, err := trace.graph(top, results.Traces, fn, call)
