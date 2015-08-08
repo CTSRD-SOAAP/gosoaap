@@ -601,26 +601,34 @@ func (n GraphNode) Dot() string {
 
 	switch true {
 	case len(n.CVE) > 0 && n.Sandbox != "":
-		// A vulnerability has been mitigated through sandboxing!
 		attrs["fillcolor"] = "#ffff66cc"
-		attrs["shape"] = "octagon"
 
 	case len(n.CVE) > 0:
-		// A vulnerability exists/existed outside a sandbox.
 		attrs["fillcolor"] = "#ff9999cc"
-		attrs["shape"] = "doubleoctagon"
 
 	case len(n.Owners) > 0:
-		// Sandbox-private data was accessed outside the sandbox.
 		attrs["fillcolor"] = "#ff99cccc"
-		attrs["shape"] = "invhouse"
 
 	case n.Sandbox != "":
 		attrs["fillcolor"] = "#99ff9999"
-		attrs["style"] = "dashed,filled"
 
 	default:
 		attrs["fillcolor"] = "#cccccccc"
+	}
+
+	switch true {
+	case len(n.CVE) > 0 && len(n.Owners) > 0:
+		attrs["shape"] = "doubleoctagon"
+
+	case len(n.Owners) > 0:
+		attrs["shape"] = "invhouse"
+
+	case len(n.CVE) > 0:
+		attrs["shape"] = "octagon"
+	}
+
+	if n.Sandbox != "" {
+		attrs["style"] = "dashed,filled"
 	}
 
 	return fmt.Sprintf("\"%s\" %s;", n.Name, dotAttrs(attrs))
