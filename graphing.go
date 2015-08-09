@@ -203,11 +203,7 @@ func (cg *CallGraph) addSimplified(begin GraphNode, old CallGraph) {
 			cg.AddCall(lastCall)
 
 		} else {
-			call := Call{
-				Caller:  begin.Name,
-				Callee:  next.Name,
-				Sandbox: lastCall.Sandbox,
-			}
+			call := newCall(begin, next, CallSite{}, lastCall.Sandbox)
 
 			weight := 0
 			for _, call := range callChain {
@@ -678,6 +674,15 @@ type Call struct {
 	Sandbox string
 }
 
+func newCall(caller GraphNode, callee GraphNode, cs CallSite, sandbox string) Call {
+	return Call{
+		Caller:   caller.Name,
+		Callee:   callee.Name,
+		CallSite: cs.Location,
+		Sandbox:  sandbox,
+	}
+}
+
 // Output GraphViz for a Call.
 func (c Call) Dot(graph CallGraph, weight int) string {
 	caller := graph.nodes[c.Caller]
@@ -739,14 +744,8 @@ func VulnGraph(results Results, progress func(string)) (CallGraph, error) {
 			return newGraphNode(cs, v.Sandbox)
 		}
 
-		call := func(caller GraphNode, callee GraphNode,
-			cs CallSite) Call {
-			return Call{
-				Caller:   caller.Name,
-				Callee:   callee.Name,
-				CallSite: cs.Location,
-				Sandbox:  v.Sandbox,
-			}
+		call := func(caller GraphNode, callee GraphNode, cs CallSite) {
+			graph.AddCall(newCall(caller, callee, cs, v.Sandbox))
 		}
 
 		top := fn(v.CallSite)
@@ -788,11 +787,7 @@ func PrivAccessGraph(results Results, progress func(string)) (CallGraph, error) 
 		}
 
 		call := func(caller GraphNode, callee GraphNode, cs CallSite) Call {
-			return Call{
-				Caller:   caller.Name,
-				Callee:   callee.Name,
-				CallSite: cs.Location,
-			}
+			return newCall(caller, callee, cs, "")
 		}
 
 		top := fn(a.CallSite)
