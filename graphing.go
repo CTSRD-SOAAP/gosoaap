@@ -351,8 +351,7 @@ func (cg CallGraph) Intersect(g CallGraph, depth int,
 
 	for call, weight := range g.calls {
 		if keep.Contains(call.Caller) && keep.Contains(call.Callee) {
-			result.AddCall(call)
-			result.calls[call] += (weight - 1)
+			result.AddCalls(call, weight)
 		}
 	}
 
