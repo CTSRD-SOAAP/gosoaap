@@ -58,8 +58,6 @@ type Vuln struct {
 	Type       string
 	CVE        []CVE
 	Restricted bool `json:"restricted_rights"`
-	Trace      int
-	TraceName  string `json:"trace_ref"`
 }
 
 func (v Vuln) CVEs() strset {
@@ -88,8 +86,6 @@ type PrivAccess struct {
 	CallSite
 
 	Sandboxes []SandboxName `json:"sandbox_private"`
-	Trace     int
-	TraceName string `json:"trace_ref"`
 }
 
 func (p PrivAccess) DataOwners() strset {
@@ -153,8 +149,10 @@ func (t CallTrace) Foreach(traces []CallTrace, fn func(CallSite)) error {
 // function in a warning's call stack.
 //
 type CallSite struct {
-	Function string
-	Location SourceLocation
+	Function  string
+	Location  SourceLocation
+	Trace     int
+	TraceName string `json:"trace_ref"`
 }
 
 func (c CallSite) String() string {
