@@ -22,7 +22,7 @@ func ParseJSON(f *os.File, progress func(string)) (Results, error) {
 	go progress(fmt.Sprintf("Loading %s", f.Name()))
 	err := decoder.Decode(&top)
 	if err != nil {
-		panic(err)
+		return Results{}, err
 	}
 	raw := top["soaap"]
 
@@ -58,7 +58,7 @@ func ParseJSON(f *os.File, progress func(string)) (Results, error) {
 			for i, vuln := range soaap.PrivateAccess {
 				num, err := traceNumber(vuln.TraceName)
 				if err != nil {
-					panic(err)
+					return Results{}, err
 				}
 
 				soaap.PrivateAccess[i].Trace = num
@@ -81,7 +81,7 @@ func ParseJSON(f *os.File, progress func(string)) (Results, error) {
 			for i, vuln := range soaap.Vulnerabilities {
 				num, err := traceNumber(vuln.TraceName)
 				if err != nil {
-					panic(err)
+					return Results{}, err
 				}
 
 				soaap.Vulnerabilities[i].Trace = num
@@ -150,7 +150,7 @@ func parseTrace(j json.RawMessage, traces []CallTrace, index int) error {
 			t.CallSites = append(t.CallSites, tmp)
 		} else {
 			if i != count-1 {
-				panic("unable to convert function")
+				return fmt.Errorf("unable to convert call site %s", v)
 			}
 
 			var tmp map[string]string
