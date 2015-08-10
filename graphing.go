@@ -212,6 +212,10 @@ func (cg CallGraph) Simplified() CallGraph {
 //
 func (cg *CallGraph) addSimplified(begin GraphNode, old CallGraph) {
 	cg.AddNode(begin)
+	for _, f := range begin.FlowsOut {
+		cg.AddNode(old.nodes[f.Callee])
+		cg.AddFlow(f)
+	}
 
 	callChain := walkChain(begin, old.nodes)
 	var next GraphNode
@@ -600,12 +604,32 @@ func (n GraphNode) AllInputs() strset {
 	return n.Callers().Union(n.DataSources())
 }
 
+func (n GraphNode) AllOutputs() strset {
+	return n.Callees().Union(n.DataSinks())
+}
+
+func (n GraphNode) Callees() strset {
+	callees := strset{}
+	for _, call := range n.CallsOut {
+		callees.Add(call.Callee)
+	}
+	return callees
+}
+
 func (n GraphNode) Callers() strset {
 	callers := strset{}
 	for _, call := range n.CallsIn {
 		callers.Add(call.Caller)
 	}
 	return callers
+}
+
+func (n GraphNode) DataSinks() strset {
+	sinks := strset{}
+	for _, flow := range n.FlowsOut {
+		sinks.Add(flow.Callee)
+	}
+	return sinks
 }
 
 func (n GraphNode) DataSources() strset {
