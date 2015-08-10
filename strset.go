@@ -37,6 +37,11 @@ func (s *strset) Remove(key string) bool {
 	return ok
 }
 
+// The number of elements in the set.
+func (s *strset) Size() int {
+	return len(*s)
+}
+
 // Compute the intersection of two sets, generating a third set without
 // modifying either of the input sets.
 func (s strset) Intersection(other strset) strset {
