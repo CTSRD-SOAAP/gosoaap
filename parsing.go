@@ -62,6 +62,22 @@ func ParseJSON(f *os.File, progress func(string)) (Results, error) {
 				}
 
 				soaap.PrivateAccess[i].Trace = num
+
+				// Build a slice of *useful* sources (i.e., those with traces)
+				sources := make([]DataSource, 0)
+
+				for _, source := range vuln.Sources {
+					if source.TraceRef != "" {
+						num, err := traceNumber(source.TraceRef)
+						if err != nil {
+							return Results{}, err
+						}
+						source.Trace = num
+						sources = append(sources, source)
+					}
+				}
+
+				soaap.PrivateAccess[i].Sources = sources
 			}
 
 		case "private_leak":

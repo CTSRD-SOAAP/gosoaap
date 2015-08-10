@@ -86,6 +86,7 @@ type PrivAccess struct {
 	CallSite
 
 	Sandboxes []SandboxName `json:"sandbox_private"`
+	Sources   []DataSource
 }
 
 func (p PrivAccess) DataOwners() strset {
@@ -100,6 +101,12 @@ func (p PrivAccess) DataOwners() strset {
 
 type SandboxName struct {
 	Name string
+}
+
+type DataSource struct {
+	Location SourceLocation
+	Trace    int
+	TraceRef string `json:"trace_ref"`
 }
 
 //

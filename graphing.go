@@ -14,6 +14,7 @@ type CallGraph struct {
 	roots  strset
 	leaves strset
 	calls  map[Call]int
+	flows  map[Call]int
 }
 
 //
@@ -24,6 +25,7 @@ func NewCallGraph() CallGraph {
 		make(map[string]GraphNode),
 		make(strset),
 		make(strset),
+		make(map[Call]int),
 		make(map[Call]int),
 	}
 }
@@ -93,6 +95,29 @@ func (cg *CallGraph) AddCalls(call Call, weight int) {
 	cg.calls[call] += weight - 1
 }
 
+func (cg *CallGraph) AddFlow(flow Call) {
+	cg.flows[flow] += 1
+
+	source := flow.Caller
+	dest := flow.Callee
+
+	c := cg.nodes[source]
+	UpdateCalls(&c.FlowsOut, flow)
+	cg.nodes[source] = c
+
+	c = cg.nodes[dest]
+	UpdateCalls(&c.FlowsIn, flow)
+	cg.nodes[dest] = c
+
+	cg.roots.Remove(dest)
+	cg.leaves.Remove(source)
+}
+
+func (cg *CallGraph) AddFlows(flow Call, weight int) {
+	cg.AddFlow(flow)
+	cg.flows[flow] += weight - 1
+}
+
 func (cg *CallGraph) AddNode(node GraphNode) {
 	name := node.Name
 
@@ -102,11 +127,11 @@ func (cg *CallGraph) AddNode(node GraphNode) {
 
 	cg.nodes[name] = node
 
-	if len(node.CallsIn) == 0 {
+	if len(node.CallsIn) == 0 && len(node.FlowsIn) == 0 {
 		cg.roots.Add(name)
 	}
 
-	if len(node.CallsOut) == 0 {
+	if len(node.CallsOut) == 0 && len(node.FlowsOut) == 0 {
 		cg.leaves.Add(name)
 	}
 }
@@ -256,8 +281,8 @@ func walkChain(start GraphNode, nodes map[string]GraphNode) []Call {
 //
 // Report the size of the graph (number of nodes and number of edges).
 //
-func (cg CallGraph) Size() (int, int) {
-	return len(cg.nodes), len(cg.calls)
+func (cg CallGraph) Size() (int, int, int) {
+	return len(cg.nodes), len(cg.calls), len(cg.flows)
 }
 
 //
@@ -265,20 +290,22 @@ func (cg CallGraph) Size() (int, int) {
 // any two leaf nodes must intersect within `depth` calls.
 //
 func (cg *CallGraph) AddIntersecting(g CallGraph, depth int) error {
+	// The method that selects all inputs (callers and data flows)
+	// into a GraphNode.
+	selector := GraphNode.AllInputs
 
 	// Collect our leaves and their ancestors (up to `depth` calls).
 	ancestors := make(strset)
 
 	for id := range cg.leaves {
-		ancestors = ancestors.Union(
-			cg.CollectNodes(id, GraphNode.Callers, depth))
+		ancestors = ancestors.Union(cg.CollectNodes(id, selector, depth))
 	}
 
 	// Keep those leaves with an ancestor common to the above.
 	keep := make(strset)
 
 	for leaf := range g.leaves {
-		nodes := g.CollectNodes(leaf, GraphNode.Callers, depth)
+		nodes := g.CollectNodes(leaf, selector, depth)
 		for a := range nodes {
 			if ancestors.Contains(a) {
 				keep = keep.Union(nodes)
@@ -297,6 +324,12 @@ func (cg *CallGraph) AddIntersecting(g CallGraph, depth int) error {
 		}
 	}
 
+	for flow, weight := range g.flows {
+		if keep.Contains(flow.Caller) && keep.Contains(flow.Callee) {
+			cg.AddFlows(flow, weight)
+		}
+	}
+
 	return nil
 }
 
@@ -310,6 +343,7 @@ func (cg *CallGraph) AddIntersecting(g CallGraph, depth int) error {
 func (cg CallGraph) Intersect(g CallGraph, depth int,
 	keepBacktrace bool) (CallGraph, error) {
 
+	selector := GraphNode.AllInputs
 	result := NewCallGraph()
 
 	// Collect our leaves and their ancestors (up to `depth` calls).
@@ -317,21 +351,22 @@ func (cg CallGraph) Intersect(g CallGraph, depth int,
 
 	for id := range cg.leaves {
 		ancestors = ancestors.Union(
-			cg.CollectNodes(id, GraphNode.Callers, depth))
+			cg.CollectNodes(id, selector, depth))
 	}
 
 	// Keep those leaves with an ancestor common to the above.
 	keep := make(strset)
 
 	for leaf := range g.leaves {
-		nodes := g.CollectNodes(leaf, GraphNode.Callers, depth)
+		nodes := g.CollectNodes(leaf, selector, depth)
+
 		for a := range nodes {
 			if ancestors.Contains(a) {
 				keep = keep.Union(nodes)
 
 				if keepBacktrace {
-					backtrace := g.CollectNodes(leaf,
-						GraphNode.Callers, -1)
+					backtrace := g.CollectNodes(
+						leaf, selector, -1)
 
 					keep = keep.Union(backtrace)
 				}
@@ -351,19 +386,26 @@ func (cg CallGraph) Intersect(g CallGraph, depth int,
 		}
 	}
 
+	for flow, weight := range g.flows {
+		if keep.Contains(flow.Caller) && keep.Contains(flow.Callee) {
+			result.AddFlows(flow, weight)
+		}
+	}
+
 	// Also filter out leaves from the LHS.
 	ancestors = keep
 	keep = make(strset)
 
 	for leaf := range cg.leaves {
-		nodes := cg.CollectNodes(leaf, GraphNode.Callers, depth)
+		nodes := cg.CollectNodes(leaf, selector, depth)
+
 		for a := range nodes {
 			if ancestors.Contains(a) {
 				keep = keep.Union(nodes)
 
 				if keepBacktrace {
-					backtrace := cg.CollectNodes(leaf,
-						GraphNode.Callers, -1)
+					backtrace := cg.CollectNodes(
+						leaf, selector, -1)
 
 					keep = keep.Union(backtrace)
 				}
@@ -379,8 +421,13 @@ func (cg CallGraph) Intersect(g CallGraph, depth int,
 
 	for call, weight := range cg.calls {
 		if keep.Contains(call.Caller) && keep.Contains(call.Callee) {
-			result.AddCall(call)
-			result.calls[call] += (weight - 1)
+			result.AddCalls(call, weight)
+		}
+	}
+
+	for flow, weight := range cg.flows {
+		if keep.Contains(flow.Caller) && keep.Contains(flow.Callee) {
+			result.AddFlows(flow, weight)
 		}
 	}
 
@@ -398,6 +445,11 @@ func (cg *CallGraph) Union(g CallGraph) error {
 	for call, count := range g.calls {
 		cg.AddCall(call)
 		cg.calls[call] += (count - 1)
+	}
+
+	for flow, count := range g.flows {
+		cg.AddFlow(flow)
+		cg.flows[flow] += (count - 1)
 	}
 
 	return nil
@@ -480,7 +532,11 @@ func (cg CallGraph) WriteDot(out io.Writer, groupBy string) error {
 	}
 
 	for c, count := range cg.calls {
-		fmt.Fprintf(out, "	%s\n", c.Dot(cg, count))
+		fmt.Fprintf(out, "	%s\n", c.Dot(cg, count, false))
+	}
+
+	for c, count := range cg.flows {
+		fmt.Fprintf(out, "	%s\n", c.Dot(cg, count, true))
 	}
 
 	fmt.Fprintf(out, "}\n")
@@ -517,6 +573,8 @@ type GraphNode struct {
 
 	CallsIn  []Call
 	CallsOut []Call
+	FlowsIn  []Call
+	FlowsOut []Call
 
 	Tags strset
 }
@@ -531,9 +589,15 @@ func newGraphNode(cs CallSite, sandbox string) GraphNode {
 	node.Owners = make(strset)
 	node.CallsIn = make([]Call, 0)
 	node.CallsOut = make([]Call, 0)
+	node.FlowsIn = make([]Call, 0)
+	node.FlowsOut = make([]Call, 0)
 	node.Tags = make(strset)
 
 	return node
+}
+
+func (n GraphNode) AllInputs() strset {
+	return n.Callers().Union(n.DataSources())
 }
 
 func (n GraphNode) Callers() strset {
@@ -544,6 +608,13 @@ func (n GraphNode) Callers() strset {
 	return callers
 }
 
+func (n GraphNode) DataSources() strset {
+	sources := strset{}
+	for _, flow := range n.FlowsIn {
+		sources.Add(flow.Caller)
+	}
+	return sources
+}
 
 //
 // Colours that represent different kinds of sandboxes, data, etc.
@@ -650,6 +721,8 @@ func (n *GraphNode) Update(g GraphNode) {
 
 	UpdateCalls(&n.CallsIn, g.CallsIn...)
 	UpdateCalls(&n.CallsOut, g.CallsOut...)
+	UpdateCalls(&n.FlowsIn, g.FlowsIn...)
+	UpdateCalls(&n.FlowsOut, g.FlowsOut...)
 	n.CVE.Union(g.CVE)
 	n.Owners.Union(g.Owners)
 	n.Tags.Union(g.Tags)
@@ -698,13 +771,22 @@ func newCall(caller GraphNode, callee GraphNode, cs CallSite, sandbox string) Ca
 }
 
 // Output GraphViz for a Call.
-func (c Call) Dot(graph CallGraph, weight int) string {
+func (c Call) Dot(graph CallGraph, weight int, flow bool) string {
 	caller := graph.nodes[c.Caller]
 	callee := graph.nodes[c.Callee]
 
 	label := c.CallSite.String()
-	colour := Unspecified
-	if c.Sandbox != "" {
+	style := ""
+	width := 1 + math.Log(float64(weight))
+
+	var colour string
+	if flow {
+		colour = PrivateData
+		style = "dashed"
+		weight = 0
+	} else if c.Sandbox == "" {
+		colour = Unspecified
+	} else {
 		colour = Sandboxed
 	}
 
@@ -712,7 +794,8 @@ func (c Call) Dot(graph CallGraph, weight int) string {
 		"color":     colour + "cc",
 		"fontcolor": colour,
 		"label":     label,
-		"penwidth":  1 + math.Log(float64(weight)),
+		"penwidth":  width,
+		"style":     style,
 		"weight":    weight,
 	}
 
@@ -742,7 +825,7 @@ func GraphAnalyses() []string {
 	return keys
 }
 
-type callMaker func(GraphNode, GraphNode, CallSite) Call
+type callMaker func(GraphNode, GraphNode, CallSite)
 type nodeMaker func(CallSite) GraphNode
 
 //
@@ -794,14 +877,17 @@ func PrivAccessGraph(results Results, progress func(string)) (CallGraph, error) 
 	count := 0
 	for _, a := range accesses {
 		trace := results.Traces[a.Trace]
-		sandboxes := a.DataOwners().Join(",")
 
 		fn := func(cs CallSite) GraphNode {
-			return newGraphNode(cs, sandboxes)
+			return newGraphNode(cs, "")
 		}
 
-		call := func(caller GraphNode, callee GraphNode, cs CallSite) Call {
-			return newCall(caller, callee, cs, "")
+		call := func(caller GraphNode, callee GraphNode, cs CallSite) {
+			graph.AddCall(newCall(caller, callee, cs, ""))
+		}
+
+		flow := func(caller GraphNode, callee GraphNode, cs CallSite) {
+			graph.AddFlow(newCall(caller, callee, cs, ""))
 		}
 
 		top := fn(a.CallSite)
@@ -814,6 +900,16 @@ func PrivAccessGraph(results Results, progress func(string)) (CallGraph, error) 
 		}
 
 		graph.Union(g)
+
+		for _, source := range a.Sources {
+			trace := results.Traces[source.Trace]
+			g, err := trace.graph(top, results.Traces, fn, flow)
+			if err != nil {
+				return CallGraph{}, err
+			}
+
+			graph.Union(g)
+		}
 
 		count++
 		if count%chunk == 0 {
@@ -841,7 +937,7 @@ func (t CallTrace) graph(top GraphNode, traces []CallTrace,
 		caller := makeNode(cs)
 		graph.AddNode(caller)
 
-		graph.AddCall(makeCall(caller, callee, cs))
+		makeCall(caller, callee, cs)
 		callee = caller
 	})
 

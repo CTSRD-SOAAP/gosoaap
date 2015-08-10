@@ -93,16 +93,18 @@ func main() {
 		return
 	}
 
-	nodes, edges := graph.Size()
-	fmt.Printf("Result: %d nodes and %d edges\n", nodes, edges)
+	nodes, edges, flows := graph.Size()
+	fmt.Printf("Result: %d nodes, %d calls and %d flows\n",
+		nodes, edges, flows)
 
 	//
 	// Apply any requested transformations:
 	//
 	if *simplify {
 		graph = graph.Simplified()
-		nodes, edges = graph.Size()
-		fmt.Printf("Simplified: %d nodes and %d edges\n", nodes, edges)
+		nodes, edges, flows = graph.Size()
+		fmt.Printf("Simplified: %d nodes, %d calls and %d flows\n",
+			nodes, edges, flows)
 	}
 
 	//
@@ -173,9 +175,10 @@ func analyzeResultsFile(f *os.File, analyses []string) (soaap.CallGraph, error) 
 			return graph, err
 		}
 
-		nodes, edges := g.Size()
-		report(fmt.Sprintf("%s '%s' analysis (%d nodes, %d edges)",
-			description, analysis, nodes, edges))
+		nodes, edges, flows := g.Size()
+		report(fmt.Sprintf(
+			"%s '%s' analysis (%d nodes, %d edges, %d flows)",
+			description, analysis, nodes, edges, flows))
 
 		err = combineGraphs(g)
 		if err != nil {
