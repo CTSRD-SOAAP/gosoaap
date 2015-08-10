@@ -544,6 +544,18 @@ func (n GraphNode) Callers() strset {
 	return callers
 }
 
+
+//
+// Colours that represent different kinds of sandboxes, data, etc.
+//
+const (
+	Contained   = "#ffff33"
+	PrivateData = "#3399ff"
+	Sandboxed   = "#66ff66"
+	Unspecified = "#999999"
+	Vulnerable  = "#ff6666"
+)
+
 //
 // Construct a GraphViz Dot description of a GraphNode.
 //
@@ -589,26 +601,28 @@ func (n GraphNode) Dot() string {
 		label += "\n<<" + n.Sandbox + ">>"
 	}
 
-	attrs := map[string]interface{}{
-		"label": label,
-		"style": "filled",
-	}
+	colour := Unspecified
 
 	switch true {
 	case len(n.CVE) > 0 && n.Sandbox != "":
-		attrs["fillcolor"] = "#ffff66cc"
+		colour = Contained
 
 	case len(n.CVE) > 0:
-		attrs["fillcolor"] = "#ff9999cc"
+		colour = Vulnerable
 
 	case len(n.Owners) > 0:
-		attrs["fillcolor"] = "#ff99cccc"
+		colour = PrivateData
 
 	case n.Sandbox != "":
-		attrs["fillcolor"] = "#99ff9999"
+		colour = Sandboxed
+	}
 
-	default:
-		attrs["fillcolor"] = "#cccccccc"
+	colour = colour + "44" // transparency
+
+	attrs := map[string]interface{}{
+		"fillcolor": colour,
+		"label":     label,
+		"style":     "filled",
 	}
 
 	switch true {
@@ -689,13 +703,13 @@ func (c Call) Dot(graph CallGraph, weight int) string {
 	callee := graph.nodes[c.Callee]
 
 	label := c.CallSite.String()
-	colour := "#993333"
+	colour := Unspecified
 	if c.Sandbox != "" {
-		colour = "#339933"
+		colour = Sandboxed
 	}
 
 	attrs := map[string]interface{}{
-		"color":     colour + "66",
+		"color":     colour + "cc",
 		"fontcolor": colour,
 		"label":     label,
 		"penwidth":  1 + math.Log(float64(weight)),
