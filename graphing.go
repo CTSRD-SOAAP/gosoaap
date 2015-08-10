@@ -250,8 +250,7 @@ func (cg *CallGraph) addSimplified(begin GraphNode, old CallGraph) {
 }
 
 //
-// Traverse a linear chain of calls until we encounter an "interesting" node
-// (one with multiple callers, multiple callees or a CVE).
+// Traverse a linear chain of calls until we encounter an "interesting" node.
 //
 // Returns the number of calls traversed and the final node in the chain.
 //
@@ -260,7 +259,7 @@ func walkChain(start GraphNode, nodes map[string]GraphNode) []Call {
 	n := start
 
 	for {
-		if len(n.CallsIn) > 1 || len(n.CallsOut) != 1 || len(n.CVE) > 0 {
+		if !n.IsSimple() || len(n.CallsOut) != 1 {
 			return chain
 		}
 
@@ -638,6 +637,24 @@ func (n GraphNode) DataSources() strset {
 		sources.Add(flow.Caller)
 	}
 	return sources
+}
+
+//
+// A node is "simple" (or uninteresting, or boring) if none of the
+// following "interesting" characteristics apply:
+//
+//  - it has multiple inputs (it joins chains together)
+//  - it has no inputs (it's a root node)
+//  - it has multiple outputs (it splits chains apart)
+//  - it has no outputs (it's a leaf node)
+//  - it has been marked as previously-vulnerable
+//  - it accesses private data
+//
+func (n GraphNode) IsSimple() bool {
+	return len(n.AllInputs()) == 1 &&
+		len(n.AllOutputs()) == 1 &&
+		n.CVE.Size() == 0 &&
+		n.Owners.Size() == 0
 }
 
 //
