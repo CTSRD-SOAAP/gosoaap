@@ -28,7 +28,7 @@ func ParseJSON(f *os.File, progress func(string)) (Results, error) {
 
 	var soaap Results
 
-	maxTraceSize := len(raw) - 5
+	maxTraceSize := len(raw)
 	soaap.Traces = make([]CallTrace, maxTraceSize)
 
 	parsed := 0
@@ -133,6 +133,11 @@ func ParseJSON(f *os.File, progress func(string)) (Results, error) {
 // need this function any more.
 //
 func parseTrace(j json.RawMessage, traces []CallTrace, index int) error {
+	if index >= len(traces) {
+		return fmt.Errorf("index (%d) too large for traces (len: %d)",
+			index, len(traces))
+	}
+
 	var x map[string]json.RawMessage
 	err := json.Unmarshal(j, &x)
 	if err != nil {
