@@ -270,7 +270,7 @@ func walkChain(start GraphNode, nodes map[string]GraphNode) []Call {
 
 		next := nodes[call.Callee]
 
-		if len(next.CVE) > 0 {
+		if len(next.CVE) > 0 || next.Owners.Size() > 0 {
 			return chain
 		}
 
