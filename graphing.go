@@ -150,6 +150,21 @@ func (cg *CallGraph) AddNode(node GraphNode) {
 	}
 }
 
+//
+// Find ancestors of this node by walking both its call graph and its
+// data flow graph.
+//
+// Note that this is different from walking the call-and-data-flow graph:
+// it's possible to have calls in one direction and flows in the other,
+// yielding cycles in the combined graph.
+//
+func (cg CallGraph) Ancestors(root string, depth int) strset {
+	a := cg.CollectNodes(root, GraphNode.Callers, depth)
+	b := cg.CollectNodes(root, GraphNode.DataSources, depth)
+
+	return a.Union(b)
+}
+
 func (cg *CallGraph) CollectNodes(root string,
 	selector func(GraphNode) strset, depth int) strset {
 
@@ -360,31 +375,27 @@ func (cg *CallGraph) AddIntersecting(g CallGraph, depth int) error {
 func (cg CallGraph) Intersect(g CallGraph, depth int,
 	keepBacktrace bool) (CallGraph, error) {
 
-	selector := GraphNode.AllInputs
 	result := NewCallGraph()
 
 	// Collect our leaves and their ancestors (up to `depth` calls).
 	ancestors := make(strset)
 
 	for id := range cg.leaves {
-		ancestors = ancestors.Union(
-			cg.CollectNodes(id, selector, depth))
+		ancestors = ancestors.Union(cg.Ancestors(id, depth))
 	}
 
 	// Keep those leaves with an ancestor common to the above.
 	keep := make(strset)
 
 	for leaf := range g.leaves {
-		nodes := g.CollectNodes(leaf, selector, depth)
+		nodes := g.Ancestors(leaf, depth)
 
 		for a := range nodes {
 			if ancestors.Contains(a) {
 				keep = keep.Union(nodes)
 
 				if keepBacktrace {
-					backtrace := g.CollectNodes(
-						leaf, selector, -1)
-
+					backtrace := g.Ancestors(leaf, -1)
 					keep = keep.Union(backtrace)
 				}
 
@@ -414,16 +425,14 @@ func (cg CallGraph) Intersect(g CallGraph, depth int,
 	keep = make(strset)
 
 	for leaf := range cg.leaves {
-		nodes := cg.CollectNodes(leaf, selector, depth)
+		nodes := cg.Ancestors(leaf, depth)
 
 		for a := range nodes {
 			if ancestors.Contains(a) {
 				keep = keep.Union(nodes)
 
 				if keepBacktrace {
-					backtrace := cg.CollectNodes(
-						leaf, selector, -1)
-
+					backtrace := cg.Ancestors(leaf, -1)
 					keep = keep.Union(backtrace)
 				}
 
