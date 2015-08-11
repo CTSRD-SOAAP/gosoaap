@@ -469,13 +469,11 @@ func (cg *CallGraph) Union(g CallGraph) error {
 	}
 
 	for call, count := range g.calls {
-		cg.AddCall(call)
-		cg.calls[call] += (count - 1)
+		cg.AddCalls(call, count)
 	}
 
 	for flow, count := range g.flows {
-		cg.AddFlow(flow)
-		cg.flows[flow] += (count - 1)
+		cg.AddFlows(flow, count)
 	}
 
 	return nil
