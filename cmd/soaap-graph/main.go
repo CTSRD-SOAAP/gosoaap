@@ -146,7 +146,7 @@ func analyzeResultsFile(f *os.File, analyses []string) (soaap.CallGraph, error) 
 
 		case '.':
 			description = fmt.Sprintf("Adding intersection (depth %d) with",
-				intersectionDepth)
+				*intersectionDepth)
 
 			combineGraphs = func(g soaap.CallGraph) error {
 				return graph.AddIntersecting(g,
@@ -156,7 +156,7 @@ func analyzeResultsFile(f *os.File, analyses []string) (soaap.CallGraph, error) 
 
 		case '^':
 			description = fmt.Sprintf("Intersecting (depth %d) with",
-				intersectionDepth)
+				*intersectionDepth)
 
 			combineGraphs = func(g soaap.CallGraph) error {
 				graph, err = graph.Intersect(g,
