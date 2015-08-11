@@ -89,8 +89,8 @@ func main() {
 	}
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s\n", err)
-		return
+		fmt.Fprintf(os.Stderr, "\nerror: %s\n", err)
+		os.Exit(1)
 	}
 
 	nodes, edges, flows := graph.Size()
