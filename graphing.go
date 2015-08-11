@@ -186,6 +186,33 @@ func (cg *CallGraph) CollectNodes(root string,
 }
 
 //
+// Filter a callgraph to only contain the specified nodes.
+//
+func (cg CallGraph) Filter(keep strset) CallGraph {
+	result := NewCallGraph()
+
+	for id := range keep {
+		if node, ok := cg.nodes[id]; ok {
+			result.AddNode(node)
+		}
+	}
+
+	for call, weight := range cg.calls {
+		if keep.Contains(call.Caller) && keep.Contains(call.Callee) {
+			result.AddCalls(call, weight)
+		}
+	}
+
+	for flow, weight := range cg.flows {
+		if keep.Contains(flow.Caller) && keep.Contains(flow.Callee) {
+			result.AddFlows(flow, weight)
+		}
+	}
+
+	return result
+}
+
+//
 // Save a CallGraph to an os.File using a binary encoding.
 //
 func (cg CallGraph) Save(f *os.File) error {
@@ -381,18 +408,14 @@ func (cg *CallGraph) AddIntersecting(g CallGraph, depth int) error {
 func (cg CallGraph) Intersect(g CallGraph, depth int,
 	keepBacktrace bool) (CallGraph, error) {
 
-	result := NewCallGraph()
-
 	// Collect our leaves and their ancestors (up to `depth` calls).
 	ancestors := make(strset)
-
 	for id := range cg.leaves {
 		ancestors = ancestors.Union(cg.Ancestors(id, depth))
 	}
 
 	// Keep those leaves with an ancestor common to the above.
 	keep := make(strset)
-
 	for leaf := range g.leaves {
 		nodes := g.Ancestors(leaf, depth)
 
@@ -410,26 +433,8 @@ func (cg CallGraph) Intersect(g CallGraph, depth int,
 		}
 	}
 
-	for id := range keep {
-		result.AddNode(g.nodes[id])
-	}
-
-	for call, weight := range g.calls {
-		if keep.Contains(call.Caller) && keep.Contains(call.Callee) {
-			result.AddCalls(call, weight)
-		}
-	}
-
-	for flow, weight := range g.flows {
-		if keep.Contains(flow.Caller) && keep.Contains(flow.Callee) {
-			result.AddFlows(flow, weight)
-		}
-	}
-
 	// Also filter out leaves from the LHS.
-	ancestors = keep
-	keep = make(strset)
-
+	ancestors = keep.Clone()
 	for leaf := range cg.leaves {
 		nodes := cg.Ancestors(leaf, depth)
 
@@ -447,23 +452,10 @@ func (cg CallGraph) Intersect(g CallGraph, depth int,
 		}
 	}
 
-	for id := range keep {
-		result.AddNode(cg.nodes[id])
-	}
+	result := cg.Filter(keep)
+	err := result.Union(g.Filter(keep))
 
-	for call, weight := range cg.calls {
-		if keep.Contains(call.Caller) && keep.Contains(call.Callee) {
-			result.AddCalls(call, weight)
-		}
-	}
-
-	for flow, weight := range cg.flows {
-		if keep.Contains(flow.Caller) && keep.Contains(flow.Callee) {
-			result.AddFlows(flow, weight)
-		}
-	}
-
-	return result, nil
+	return result, err
 }
 
 //
