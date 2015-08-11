@@ -54,8 +54,12 @@ func LoadGraph(f *os.File, report func(string)) (CallGraph, error) {
 		return cg, err
 	}
 
+	if err := dec.Decode(&cg.flows); err != nil {
+		return cg, err
+	}
+
 	//
-	// Reconstitute each node's callers and callees.
+	// Reconstitute calls and flows.
 	//
 	for call := range cg.calls {
 		callee := cg.nodes[call.Callee]
@@ -65,6 +69,16 @@ func LoadGraph(f *os.File, report func(string)) (CallGraph, error) {
 		caller := cg.nodes[call.Caller]
 		caller.CallsOut = append(caller.CallsOut, call)
 		cg.nodes[call.Caller] = caller
+	}
+
+	for flow := range cg.flows {
+		dest := cg.nodes[flow.Callee]
+		dest.FlowsIn = append(dest.FlowsIn, flow)
+		cg.nodes[flow.Callee] = dest
+
+		source := cg.nodes[flow.Caller]
+		source.FlowsOut = append(source.FlowsOut, flow)
+		cg.nodes[flow.Caller] = source
 	}
 
 	return cg, nil
