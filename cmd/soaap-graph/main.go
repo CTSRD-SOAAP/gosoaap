@@ -135,55 +135,8 @@ func analyzeResultsFile(f *os.File, analyses []string) (soaap.CallGraph, error) 
 	graph := soaap.NewCallGraph()
 
 	for _, analysis := range analyses {
-		var combineGraphs func(soaap.CallGraph) error
-		var description string
-
-		switch analysis[0] {
-		case '+':
-			description = "Adding"
-			combineGraphs = graph.Union
-			analysis = analysis[1:]
-
-		case '.':
-			description = fmt.Sprintf("Adding intersection (depth %d) with",
-				*intersectionDepth)
-
-			combineGraphs = func(g soaap.CallGraph) error {
-				return graph.AddIntersecting(g,
-					*intersectionDepth)
-			}
-			analysis = analysis[1:]
-
-		case '^':
-			description = fmt.Sprintf("Intersecting (depth %d) with",
-				*intersectionDepth)
-
-			combineGraphs = func(g soaap.CallGraph) error {
-				graph, err = graph.Intersect(g,
-					*intersectionDepth, true)
-				return err
-			}
-			analysis = analysis[1:]
-
-		default:
-			description = "Adding"
-			combineGraphs = graph.Union
-		}
-
-		g, err := results.ExtractGraph(analysis, report)
-		if err != nil {
-			return graph, err
-		}
-
-		nodes, edges, flows := g.Size()
-		report(fmt.Sprintf(
-			"%s '%s' analysis (%d nodes, %d edges, %d flows)",
-			description, analysis, nodes, edges, flows))
-
-		err = combineGraphs(g)
-		if err != nil {
-			break
-		}
+		graph, err = soaap.ApplyAnalysis(
+			analysis, &graph, &results, *intersectionDepth, report)
 	}
 
 	return graph, err
