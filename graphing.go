@@ -200,6 +200,8 @@ func (cg CallGraph) Save(f *os.File) error {
 		n := node
 		n.CallsOut = nil
 		n.CallsIn = nil
+		n.FlowsOut = nil
+		n.FlowsIn = nil
 		nodes[name] = n
 	}
 
@@ -216,6 +218,10 @@ func (cg CallGraph) Save(f *os.File) error {
 	}
 
 	if err := enc.Encode(cg.calls); err != nil {
+		return err
+	}
+
+	if err := enc.Encode(cg.flows); err != nil {
 		return err
 	}
 
