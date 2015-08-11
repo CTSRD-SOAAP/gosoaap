@@ -858,6 +858,10 @@ func (c Call) Dot(graph CallGraph, weight int, flow bool) string {
 		caller.Name, callee.Name, dotAttrs(attrs))
 }
 
+func (c Call) String() string {
+	return fmt.Sprintf("'%s' -> '%s'", c.Caller, c.Callee)
+}
+
 //
 // A function that extracts a CallGraph from SOAAP Results.
 //
