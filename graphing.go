@@ -36,7 +36,7 @@ func NewCallGraph() CallGraph {
 func Legend() CallGraph {
 	cg := NewCallGraph()
 
-	vuln := newGraphNode(CallSite{Function: "prevously_vulnerable"}, "")
+	vuln := newGraphNode(CallSite{Function: "previously_vulnerable"}, "")
 	vuln.CVE.Add("CVE-1900-XXXXX")
 	cg.AddNode(vuln)
 
