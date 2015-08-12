@@ -30,6 +30,9 @@ func main() {
 	//
 	// Command-line arguments:
 	//
+	legend := flag.Bool("legend", false,
+		"emit a Dot legend rather than an actual graph")
+
 	analyses := Analyses{"vuln"}
 	flag.Var(&analyses, "analyses",
 		"SOAAP analysis results to graph (options: "+
@@ -45,20 +48,33 @@ func main() {
 
 	flag.Parse()
 
-	if len(flag.Args()) != 1 {
+	var input string
+	switch len(flag.Args()) {
+	case 0:
+		input = "-"
+
+	case 1:
+		input = flag.Args()[0]
+
+	default:
 		printUsage()
 		return
 	}
 
-	input := flag.Args()[0]
-
 	//
 	// Load input file:
 	//
-	f, err := os.Open(input)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s\n", err)
-		return
+	var f *os.File
+	var err error
+
+	if input == "-" {
+		f = os.Stdin
+	} else {
+		f, err = os.Open(input)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %s\n", err)
+			return
+		}
 	}
 
 	//
@@ -76,15 +92,24 @@ func main() {
 	}
 
 	//
-	// Is the input file a binary-encoded graph or a set of SOAAP results
-	// that we need to extract a graph from?
+	// The call/dataflow graph to transform and output.
 	//
 	var graph soaap.CallGraph
 
-	if strings.HasSuffix(f.Name(), ".graph") {
+	//
+	// Special case: legend of possible node types.
+	//
+	if *legend {
+		graph = soaap.Legend()
+
+	} else if strings.HasSuffix(f.Name(), ".graph") {
+
+		// Load binary graph file.
 		graph, err = soaap.LoadGraph(f, report)
 
 	} else {
+
+		// Load SOAAP results.
 		graph, err = analyzeResultsFile(f, analyses)
 	}
 

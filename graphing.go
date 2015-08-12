@@ -31,6 +31,35 @@ func NewCallGraph() CallGraph {
 }
 
 //
+// Create a CallGraph that contains one of each type of node.
+//
+func Legend() CallGraph {
+	cg := NewCallGraph()
+
+	vuln := newGraphNode(CallSite{Function: "prevously_vulnerable"}, "")
+	vuln.CVE.Add("CVE-1900-XXXXX")
+	cg.AddNode(vuln)
+
+	mitigated := newGraphNode(
+		CallSite{Function: "vulnerability_mitigated"}, "sandbox")
+	mitigated.CVE.Add("CVE-1900-XXXXX")
+	cg.AddNode(mitigated)
+
+	sandboxed := newGraphNode(
+		CallSite{Function: "sandboxed"}, "sandbox")
+	cg.AddNode(sandboxed)
+
+	private := newGraphNode(CallSite{Function: "private_access"}, "")
+	private.Owners.Add("priv_owner")
+	cg.AddNode(private)
+
+	ordinary := newGraphNode(CallSite{Function: "ordinary_function"}, "")
+	cg.AddNode(ordinary)
+
+	return cg
+}
+
+//
 // Load a CallGraph from a binary-encoded file.
 //
 func LoadGraph(f *os.File, report func(string)) (CallGraph, error) {
@@ -478,7 +507,12 @@ func (cg *CallGraph) Union(g CallGraph) error {
 }
 
 func (cg CallGraph) WriteDot(out io.Writer, groupBy string) error {
-	fmt.Fprintln(out, `digraph {
+	rankdir := "BT"
+	if len(cg.calls) == 0 || len(cg.flows) == 0 {
+		rankdir = "LR"
+	}
+
+	fmt.Fprintf(out, `digraph {
 
 	graph [ fontname = "Inconsolata" ];
 	node [ fontname = "Inconsolata" ];
@@ -486,9 +520,9 @@ func (cg CallGraph) WriteDot(out io.Writer, groupBy string) error {
 
 	labeljust = "l";
 	labelloc = "b";
-	rankdir = "BT";
+	rankdir = "%s";
 
-`)
+`, rankdir)
 
 	ungrouped := make([]string, 0)
 
