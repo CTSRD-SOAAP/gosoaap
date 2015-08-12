@@ -508,7 +508,7 @@ func (cg *CallGraph) Union(g CallGraph) error {
 
 func (cg CallGraph) WriteDot(out io.Writer, groupBy string) error {
 	rankdir := "BT"
-	if len(cg.calls) == 0 || len(cg.flows) == 0 {
+	if len(cg.calls) == 0 && len(cg.flows) == 0 {
 		rankdir = "LR"
 	}
 
