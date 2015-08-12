@@ -105,11 +105,13 @@ func main() {
 	} else if strings.HasSuffix(f.Name(), ".graph") {
 
 		// Load binary graph file.
+		report(fmt.Sprintf("Loading binary graph data from '%s'...", f.Name()))
 		graph, err = soaap.LoadGraph(f, report)
 
 	} else {
 
 		// Load SOAAP results.
+		report(fmt.Sprintf("Loading SOAAP results from '%s'...", f.Name()))
 		graph, err = analyzeResultsFile(f, analyses)
 	}
 
