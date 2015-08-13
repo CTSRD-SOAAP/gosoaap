@@ -56,6 +56,10 @@ func Legend() CallGraph {
 	ordinary := newGraphNode(CallSite{Function: "ordinary_function"}, "")
 	cg.AddNode(ordinary)
 
+	for _, node := range cg.nodes {
+		node.Tags.Add("Legend")
+	}
+
 	return cg
 }
 
@@ -558,6 +562,9 @@ func (cg CallGraph) WriteDot(out io.Writer, groupBy string) error {
 
 			case "sandbox":
 				groupName = n.Sandbox
+
+			case "tags":
+				groupName = n.Tags.Join(",")
 
 			default:
 				return fmt.Errorf("unknown grouping strategy '%s'", groupBy)
