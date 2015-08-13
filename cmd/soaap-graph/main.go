@@ -137,10 +137,15 @@ func main() {
 	//
 	// Output the results:
 	//
+	grouping := *groupBy
+	if *legend {
+		grouping = "tags"
+	}
+
 	if *binout {
 		err = graph.Save(out)
 	} else {
-		err = graph.WriteDot(out, *groupBy)
+		err = graph.WriteDot(out, grouping)
 	}
 
 	if err != nil {
