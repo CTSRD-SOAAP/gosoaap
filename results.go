@@ -58,8 +58,6 @@ type Vuln struct {
 	Type       string
 	CVE        []CVE
 	Restricted bool `json:"restricted_rights"`
-	Trace      int
-	TraceName  string `json:"trace_ref"`
 }
 
 func (v Vuln) CVEs() strset {
@@ -81,15 +79,34 @@ func (c CVE) String() string {
 }
 
 //
-// Information SOAAP reports about access to a sandbox-private variable
+// Information SOAAP reports about access to sandbox-private data
 // outside of the sandbox.
 //
 type PrivAccess struct {
 	CallSite
 
-	Sandboxes []string `json:"sandbox_private"`
-	Trace     int
-	TraceName string `json:"trace_ref"`
+	Sandboxes []SandboxName `json:"sandbox_private"`
+	Sources   []DataSource
+}
+
+func (p PrivAccess) DataOwners() strset {
+	sandboxes := strset{}
+
+	for _, s := range p.Sandboxes {
+		sandboxes.Add(s.Name)
+	}
+
+	return sandboxes
+}
+
+type SandboxName struct {
+	Name string
+}
+
+type DataSource struct {
+	Location SourceLocation
+	Trace    int
+	TraceRef string `json:"trace_ref"`
 }
 
 //
@@ -139,8 +156,10 @@ func (t CallTrace) Foreach(traces []CallTrace, fn func(CallSite)) error {
 // function in a warning's call stack.
 //
 type CallSite struct {
-	Function string
-	Location SourceLocation
+	Function  string
+	Location  SourceLocation
+	Trace     int
+	TraceName string `json:"trace_ref"`
 }
 
 func (c CallSite) String() string {

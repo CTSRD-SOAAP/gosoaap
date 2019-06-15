@@ -77,8 +77,9 @@ func main() {
 		die("error applying '%s': %s", *operation, err)
 	}
 
-	nodes, edges := graph.Size()
-	fmt.Printf("Final graph has %d nodes and %d edges.\n", nodes, edges)
+	nodes, edges, flows := graph.Size()
+	fmt.Printf("Final graph has %d nodes, %d edges and %d flows.\n",
+		nodes, edges, flows)
 
 	err = graph.Save(out)
 	if err != nil {

@@ -19,6 +19,13 @@ func (s *strset) Add(key string) {
 	(*s)[key] = true
 }
 
+// Create a by-value copy of this data structure.
+func (s strset) Clone() strset {
+	clone := make(strset)
+	clone.Union(s)
+	return clone
+}
+
 // Does this set contain a given element?
 func (s strset) Contains(key string) bool {
 	_, ok := s[key]
@@ -35,6 +42,11 @@ func (s *strset) Remove(key string) bool {
 	_, ok := (*s)[key]
 	delete(*s, key)
 	return ok
+}
+
+// The number of elements in the set.
+func (s *strset) Size() int {
+	return len(*s)
 }
 
 // Compute the intersection of two sets, generating a third set without

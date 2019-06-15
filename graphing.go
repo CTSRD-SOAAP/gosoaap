@@ -2,7 +2,6 @@ package soaap
 
 import (
 	"encoding/gob"
-	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -15,6 +14,7 @@ type CallGraph struct {
 	roots  strset
 	leaves strset
 	calls  map[Call]int
+	flows  map[Call]int
 }
 
 //
@@ -26,7 +26,41 @@ func NewCallGraph() CallGraph {
 		make(strset),
 		make(strset),
 		make(map[Call]int),
+		make(map[Call]int),
 	}
+}
+
+//
+// Create a CallGraph that contains one of each type of node.
+//
+func Legend() CallGraph {
+	cg := NewCallGraph()
+
+	vuln := newGraphNode(CallSite{Function: "previously_vulnerable"}, "")
+	vuln.CVE.Add("CVE-1900-XXXXX")
+	cg.AddNode(vuln)
+
+	mitigated := newGraphNode(
+		CallSite{Function: "vulnerability_mitigated"}, "sandbox")
+	mitigated.CVE.Add("CVE-1900-XXXXX")
+	cg.AddNode(mitigated)
+
+	sandboxed := newGraphNode(
+		CallSite{Function: "sandboxed"}, "sandbox")
+	cg.AddNode(sandboxed)
+
+	private := newGraphNode(CallSite{Function: "private_access"}, "")
+	private.Owners.Add("priv_owner")
+	cg.AddNode(private)
+
+	ordinary := newGraphNode(CallSite{Function: "ordinary_function"}, "")
+	cg.AddNode(ordinary)
+
+	for _, node := range cg.nodes {
+		node.Tags.Add("Legend")
+	}
+
+	return cg
 }
 
 //
@@ -53,8 +87,12 @@ func LoadGraph(f *os.File, report func(string)) (CallGraph, error) {
 		return cg, err
 	}
 
+	if err := dec.Decode(&cg.flows); err != nil {
+		return cg, err
+	}
+
 	//
-	// Reconstitute each node's callers and callees.
+	// Reconstitute calls and flows.
 	//
 	for call := range cg.calls {
 		callee := cg.nodes[call.Callee]
@@ -64,6 +102,16 @@ func LoadGraph(f *os.File, report func(string)) (CallGraph, error) {
 		caller := cg.nodes[call.Caller]
 		caller.CallsOut = append(caller.CallsOut, call)
 		cg.nodes[call.Caller] = caller
+	}
+
+	for flow := range cg.flows {
+		dest := cg.nodes[flow.Callee]
+		dest.FlowsIn = append(dest.FlowsIn, flow)
+		cg.nodes[flow.Callee] = dest
+
+		source := cg.nodes[flow.Caller]
+		source.FlowsOut = append(source.FlowsOut, flow)
+		cg.nodes[flow.Caller] = source
 	}
 
 	return cg, nil
@@ -94,6 +142,29 @@ func (cg *CallGraph) AddCalls(call Call, weight int) {
 	cg.calls[call] += weight - 1
 }
 
+func (cg *CallGraph) AddFlow(flow Call) {
+	cg.flows[flow] += 1
+
+	source := flow.Caller
+	dest := flow.Callee
+
+	c := cg.nodes[source]
+	UpdateCalls(&c.FlowsOut, flow)
+	cg.nodes[source] = c
+
+	c = cg.nodes[dest]
+	UpdateCalls(&c.FlowsIn, flow)
+	cg.nodes[dest] = c
+
+	cg.roots.Remove(dest)
+	cg.leaves.Remove(source)
+}
+
+func (cg *CallGraph) AddFlows(flow Call, weight int) {
+	cg.AddFlow(flow)
+	cg.flows[flow] += weight - 1
+}
+
 func (cg *CallGraph) AddNode(node GraphNode) {
 	name := node.Name
 
@@ -103,13 +174,28 @@ func (cg *CallGraph) AddNode(node GraphNode) {
 
 	cg.nodes[name] = node
 
-	if len(node.CallsIn) == 0 {
+	if len(node.CallsIn) == 0 && len(node.FlowsIn) == 0 {
 		cg.roots.Add(name)
 	}
 
-	if len(node.CallsOut) == 0 {
+	if len(node.CallsOut) == 0 && len(node.FlowsOut) == 0 {
 		cg.leaves.Add(name)
 	}
+}
+
+//
+// Find ancestors of this node by walking both its call graph and its
+// data flow graph.
+//
+// Note that this is different from walking the call-and-data-flow graph:
+// it's possible to have calls in one direction and flows in the other,
+// yielding cycles in the combined graph.
+//
+func (cg CallGraph) Ancestors(root string, depth int) strset {
+	a := cg.CollectNodes(root, GraphNode.Callers, depth)
+	b := cg.CollectNodes(root, GraphNode.DataSources, depth)
+
+	return a.Union(b)
 }
 
 func (cg *CallGraph) CollectNodes(root string,
@@ -133,6 +219,33 @@ func (cg *CallGraph) CollectNodes(root string,
 }
 
 //
+// Filter a callgraph to only contain the specified nodes.
+//
+func (cg CallGraph) Filter(keep strset) CallGraph {
+	result := NewCallGraph()
+
+	for id := range keep {
+		if node, ok := cg.nodes[id]; ok {
+			result.AddNode(node)
+		}
+	}
+
+	for call, weight := range cg.calls {
+		if keep.Contains(call.Caller) && keep.Contains(call.Callee) {
+			result.AddCalls(call, weight)
+		}
+	}
+
+	for flow, weight := range cg.flows {
+		if keep.Contains(flow.Caller) && keep.Contains(flow.Callee) {
+			result.AddFlows(flow, weight)
+		}
+	}
+
+	return result
+}
+
+//
 // Save a CallGraph to an os.File using a binary encoding.
 //
 func (cg CallGraph) Save(f *os.File) error {
@@ -147,6 +260,8 @@ func (cg CallGraph) Save(f *os.File) error {
 		n := node
 		n.CallsOut = nil
 		n.CallsIn = nil
+		n.FlowsOut = nil
+		n.FlowsIn = nil
 		nodes[name] = n
 	}
 
@@ -163,6 +278,10 @@ func (cg CallGraph) Save(f *os.File) error {
 	}
 
 	if err := enc.Encode(cg.calls); err != nil {
+		return err
+	}
+
+	if err := enc.Encode(cg.flows); err != nil {
 		return err
 	}
 
@@ -188,6 +307,10 @@ func (cg CallGraph) Simplified() CallGraph {
 //
 func (cg *CallGraph) addSimplified(begin GraphNode, old CallGraph) {
 	cg.AddNode(begin)
+	for _, f := range begin.FlowsOut {
+		cg.AddNode(old.nodes[f.Callee])
+		cg.AddFlow(f)
+	}
 
 	callChain := walkChain(begin, old.nodes)
 	var next GraphNode
@@ -204,11 +327,7 @@ func (cg *CallGraph) addSimplified(begin GraphNode, old CallGraph) {
 			cg.AddCall(lastCall)
 
 		} else {
-			call := Call{
-				Caller:  begin.Name,
-				Callee:  next.Name,
-				Sandbox: lastCall.Sandbox,
-			}
+			call := newCall(begin, next, CallSite{}, lastCall.Sandbox)
 
 			weight := 0
 			for _, call := range callChain {
@@ -226,8 +345,7 @@ func (cg *CallGraph) addSimplified(begin GraphNode, old CallGraph) {
 }
 
 //
-// Traverse a linear chain of calls until we encounter an "interesting" node
-// (one with multiple callers, multiple callees or a CVE).
+// Traverse a linear chain of calls until we encounter an "interesting" node.
 //
 // Returns the number of calls traversed and the final node in the chain.
 //
@@ -236,7 +354,7 @@ func walkChain(start GraphNode, nodes map[string]GraphNode) []Call {
 	n := start
 
 	for {
-		if len(n.CallsIn) > 1 || len(n.CallsOut) != 1 || len(n.CVE) > 0 {
+		if !n.IsSimple() || len(n.CallsOut) != 1 {
 			return chain
 		}
 
@@ -247,7 +365,7 @@ func walkChain(start GraphNode, nodes map[string]GraphNode) []Call {
 
 		next := nodes[call.Callee]
 
-		if len(next.CVE) > 0 {
+		if len(next.CVE) > 0 || next.Owners.Size() > 0 {
 			return chain
 		}
 
@@ -261,8 +379,8 @@ func walkChain(start GraphNode, nodes map[string]GraphNode) []Call {
 //
 // Report the size of the graph (number of nodes and number of edges).
 //
-func (cg CallGraph) Size() (int, int) {
-	return len(cg.nodes), len(cg.calls)
+func (cg CallGraph) Size() (int, int, int) {
+	return len(cg.nodes), len(cg.calls), len(cg.flows)
 }
 
 //
@@ -270,20 +388,22 @@ func (cg CallGraph) Size() (int, int) {
 // any two leaf nodes must intersect within `depth` calls.
 //
 func (cg *CallGraph) AddIntersecting(g CallGraph, depth int) error {
+	// The method that selects all inputs (callers and data flows)
+	// into a GraphNode.
+	selector := GraphNode.AllInputs
 
 	// Collect our leaves and their ancestors (up to `depth` calls).
 	ancestors := make(strset)
 
 	for id := range cg.leaves {
-		ancestors = ancestors.Union(
-			cg.CollectNodes(id, GraphNode.Callers, depth))
+		ancestors = ancestors.Union(cg.CollectNodes(id, selector, depth))
 	}
 
 	// Keep those leaves with an ancestor common to the above.
 	keep := make(strset)
 
 	for leaf := range g.leaves {
-		nodes := g.CollectNodes(leaf, GraphNode.Callers, depth)
+		nodes := g.CollectNodes(leaf, selector, depth)
 		for a := range nodes {
 			if ancestors.Contains(a) {
 				keep = keep.Union(nodes)
@@ -302,6 +422,12 @@ func (cg *CallGraph) AddIntersecting(g CallGraph, depth int) error {
 		}
 	}
 
+	for flow, weight := range g.flows {
+		if keep.Contains(flow.Caller) && keep.Contains(flow.Callee) {
+			cg.AddFlows(flow, weight)
+		}
+	}
+
 	return nil
 }
 
@@ -315,62 +441,42 @@ func (cg *CallGraph) AddIntersecting(g CallGraph, depth int) error {
 func (cg CallGraph) Intersect(g CallGraph, depth int,
 	keepBacktrace bool) (CallGraph, error) {
 
-	result := NewCallGraph()
-
 	// Collect our leaves and their ancestors (up to `depth` calls).
 	ancestors := make(strset)
-
 	for id := range cg.leaves {
-		ancestors = ancestors.Union(
-			cg.CollectNodes(id, GraphNode.Callers, depth))
+		ancestors = ancestors.Union(cg.Ancestors(id, depth))
 	}
 
 	// Keep those leaves with an ancestor common to the above.
 	keep := make(strset)
-
 	for leaf := range g.leaves {
-		nodes := g.CollectNodes(leaf, GraphNode.Callers, depth)
+		nodes := g.Ancestors(leaf, depth)
+
 		for a := range nodes {
 			if ancestors.Contains(a) {
 				keep = keep.Union(nodes)
 
 				if keepBacktrace {
-					backtrace := g.CollectNodes(leaf,
-						GraphNode.Callers, -1)
-
+					backtrace := g.Ancestors(leaf, -1)
 					keep = keep.Union(backtrace)
 				}
 
 				break
 			}
-		}
-	}
-
-	for id := range keep {
-		result.AddNode(g.nodes[id])
-	}
-
-	for call, weight := range g.calls {
-		if keep.Contains(call.Caller) && keep.Contains(call.Callee) {
-			result.AddCall(call)
-			result.calls[call] += (weight - 1)
 		}
 	}
 
 	// Also filter out leaves from the LHS.
-	ancestors = keep
-	keep = make(strset)
-
+	ancestors = keep.Clone()
 	for leaf := range cg.leaves {
-		nodes := cg.CollectNodes(leaf, GraphNode.Callers, depth)
+		nodes := cg.Ancestors(leaf, depth)
+
 		for a := range nodes {
 			if ancestors.Contains(a) {
 				keep = keep.Union(nodes)
 
 				if keepBacktrace {
-					backtrace := cg.CollectNodes(leaf,
-						GraphNode.Callers, -1)
-
+					backtrace := cg.Ancestors(leaf, -1)
 					keep = keep.Union(backtrace)
 				}
 
@@ -379,56 +485,38 @@ func (cg CallGraph) Intersect(g CallGraph, depth int,
 		}
 	}
 
-	for id := range keep {
-		result.AddNode(cg.nodes[id])
-	}
+	result := cg.Filter(keep)
+	err := result.Union(g.Filter(keep))
 
-	for call, weight := range cg.calls {
-		if keep.Contains(call.Caller) && keep.Contains(call.Callee) {
-			result.AddCall(call)
-			result.calls[call] += (weight - 1)
-		}
-	}
-
-	return result, nil
+	return result, err
 }
 
 //
 // Compute the union of two CallGraphs.
 //
 func (cg *CallGraph) Union(g CallGraph) error {
-	for id, node := range g.nodes {
-		// If we already have a GraphNode with this identifier,
-		// merge the two descriptions and tag sets.
-		if n, have := cg.nodes[id]; have {
-			if n.Name != node.Name {
-				return errors.New(fmt.Sprintf(
-					"Nodes in CallGraph union have"+
-						" same identifier ('%s') but"+
-						" different names ('%s' vs '%s')",
-					id, n.Name, node.Name))
-			}
-
-			for tag := range n.Tags {
-				node.Tags[tag] = true
-			}
-
-			cg.nodes[id] = node
-		} else {
-			cg.AddNode(node)
-		}
+	for _, node := range g.nodes {
+		cg.AddNode(node)
 	}
 
 	for call, count := range g.calls {
-		cg.AddCall(call)
-		cg.calls[call] += (count - 1)
+		cg.AddCalls(call, count)
+	}
+
+	for flow, count := range g.flows {
+		cg.AddFlows(flow, count)
 	}
 
 	return nil
 }
 
 func (cg CallGraph) WriteDot(out io.Writer, groupBy string) error {
-	fmt.Fprintln(out, `digraph {
+	rankdir := "BT"
+	if len(cg.calls) == 0 && len(cg.flows) == 0 {
+		rankdir = "LR"
+	}
+
+	fmt.Fprintf(out, `digraph {
 
 	graph [ fontname = "Inconsolata" ];
 	node [ fontname = "Inconsolata" ];
@@ -436,9 +524,9 @@ func (cg CallGraph) WriteDot(out io.Writer, groupBy string) error {
 
 	labeljust = "l";
 	labelloc = "b";
-	rankdir = "BT";
+	rankdir = "%s";
 
-`)
+`, rankdir)
 
 	ungrouped := make([]string, 0)
 
@@ -475,6 +563,9 @@ func (cg CallGraph) WriteDot(out io.Writer, groupBy string) error {
 			case "sandbox":
 				groupName = n.Sandbox
 
+			case "tags":
+				groupName = n.Tags.Join(",")
+
 			default:
 				return fmt.Errorf("unknown grouping strategy '%s'", groupBy)
 			}
@@ -504,7 +595,11 @@ func (cg CallGraph) WriteDot(out io.Writer, groupBy string) error {
 	}
 
 	for c, count := range cg.calls {
-		fmt.Fprintf(out, "	%s\n", c.Dot(cg, count))
+		fmt.Fprintf(out, "	%s\n", c.Dot(cg, count, false))
+	}
+
+	for c, count := range cg.flows {
+		fmt.Fprintf(out, "	%s\n", c.Dot(cg, count, true))
 	}
 
 	fmt.Fprintf(out, "}\n")
@@ -537,10 +632,12 @@ type GraphNode struct {
 	CVE strset
 
 	// The name of the sandbox(es) that own the data being accessed.
-	Owners []string
+	Owners strset
 
 	CallsIn  []Call
 	CallsOut []Call
+	FlowsIn  []Call
+	FlowsOut []Call
 
 	Tags strset
 }
@@ -551,11 +648,31 @@ func newGraphNode(cs CallSite, sandbox string) GraphNode {
 	node.Function = cs.Function
 	node.Library = cs.Location.Library
 	node.Sandbox = sandbox
+	node.CVE = make(strset)
+	node.Owners = make(strset)
 	node.CallsIn = make([]Call, 0)
 	node.CallsOut = make([]Call, 0)
+	node.FlowsIn = make([]Call, 0)
+	node.FlowsOut = make([]Call, 0)
 	node.Tags = make(strset)
 
 	return node
+}
+
+func (n GraphNode) AllInputs() strset {
+	return n.Callers().Union(n.DataSources())
+}
+
+func (n GraphNode) AllOutputs() strset {
+	return n.Callees().Union(n.DataSinks())
+}
+
+func (n GraphNode) Callees() strset {
+	callees := strset{}
+	for _, call := range n.CallsOut {
+		callees.Add(call.Callee)
+	}
+	return callees
 }
 
 func (n GraphNode) Callers() strset {
@@ -566,6 +683,51 @@ func (n GraphNode) Callers() strset {
 	return callers
 }
 
+func (n GraphNode) DataSinks() strset {
+	sinks := strset{}
+	for _, flow := range n.FlowsOut {
+		sinks.Add(flow.Callee)
+	}
+	return sinks
+}
+
+func (n GraphNode) DataSources() strset {
+	sources := strset{}
+	for _, flow := range n.FlowsIn {
+		sources.Add(flow.Caller)
+	}
+	return sources
+}
+
+//
+// A node is "simple" (or uninteresting, or boring) if none of the
+// following "interesting" characteristics apply:
+//
+//  - it has multiple inputs (it joins chains together)
+//  - it has no inputs (it's a root node)
+//  - it has multiple outputs (it splits chains apart)
+//  - it has no outputs (it's a leaf node)
+//  - it has been marked as previously-vulnerable
+//  - it accesses private data
+//
+func (n GraphNode) IsSimple() bool {
+	return len(n.AllInputs()) == 1 &&
+		len(n.AllOutputs()) == 1 &&
+		n.CVE.Size() == 0 &&
+		n.Owners.Size() == 0
+}
+
+//
+// Colours that represent different kinds of sandboxes, data, etc.
+//
+const (
+	Contained   = "#ffff33"
+	PrivateData = "#3399ff"
+	Sandboxed   = "#66ff66"
+	Unspecified = "#999999"
+	Vulnerable  = "#ff6666"
+)
+
 //
 // Construct a GraphViz Dot description of a GraphNode.
 //
@@ -574,9 +736,17 @@ func (n GraphNode) Callers() strset {
 func (n GraphNode) Dot() string {
 	label := n.Function
 
+	// Trim long node names
 	if len(label) > 30 {
+		//
+		// Split node name into <function>(<parameters>) - if applicable.
+		// Some node names don't have parameters (e.g., those that c++filt
+		// failed to demangle for some reason).
+		//
 		function := strings.Split(n.Function, "(")[0]
+
 		if len(function) == len(n.Function) {
+			// There are no parameters: perhaps demangling failed?
 			panic(fmt.Errorf("foo: '%s' '%s'", function, n.Function))
 		}
 		parameters := n.Function[len(function)+1 : len(n.Function)-1]
@@ -600,33 +770,43 @@ func (n GraphNode) Dot() string {
 		label += "\n<<" + n.Sandbox + ">>"
 	}
 
-	attrs := map[string]interface{}{
-		"label": label,
-		"style": "filled",
-	}
+	colour := Unspecified
 
 	switch true {
 	case len(n.CVE) > 0 && n.Sandbox != "":
-		// A vulnerability has been mitigated through sandboxing!
-		attrs["fillcolor"] = "#ffff66cc"
-		attrs["shape"] = "octagon"
+		colour = Contained
 
 	case len(n.CVE) > 0:
-		// A vulnerability exists/existed outside a sandbox.
-		attrs["fillcolor"] = "#ff9999cc"
+		colour = Vulnerable
+
+	case len(n.Owners) > 0:
+		colour = PrivateData
+
+	case n.Sandbox != "":
+		colour = Sandboxed
+	}
+
+	colour = colour + "44" // transparency
+
+	attrs := map[string]interface{}{
+		"fillcolor": colour,
+		"label":     label,
+		"style":     "filled",
+	}
+
+	switch true {
+	case len(n.CVE) > 0 && len(n.Owners) > 0:
 		attrs["shape"] = "doubleoctagon"
 
 	case len(n.Owners) > 0:
-		// Sandbox-private data was accessed outside the sandbox.
-		attrs["fillcolor"] = "#ff99cccc"
 		attrs["shape"] = "invhouse"
 
-	case n.Sandbox != "":
-		attrs["fillcolor"] = "#99ff9999"
-		attrs["style"] = "dashed,filled"
+	case len(n.CVE) > 0:
+		attrs["shape"] = "octagon"
+	}
 
-	default:
-		attrs["fillcolor"] = "#cccccccc"
+	if n.Sandbox != "" {
+		attrs["style"] = "dashed,filled"
 	}
 
 	return fmt.Sprintf("\"%s\" %s;", n.Name, dotAttrs(attrs))
@@ -639,7 +819,10 @@ func (n *GraphNode) Update(g GraphNode) {
 
 	UpdateCalls(&n.CallsIn, g.CallsIn...)
 	UpdateCalls(&n.CallsOut, g.CallsOut...)
+	UpdateCalls(&n.FlowsIn, g.FlowsIn...)
+	UpdateCalls(&n.FlowsOut, g.FlowsOut...)
 	n.CVE.Union(g.CVE)
+	n.Owners.Union(g.Owners)
 	n.Tags.Union(g.Tags)
 }
 
@@ -676,27 +859,50 @@ type Call struct {
 	Sandbox string
 }
 
+func newCall(caller GraphNode, callee GraphNode, cs CallSite, sandbox string) Call {
+	return Call{
+		Caller:   caller.Name,
+		Callee:   callee.Name,
+		CallSite: cs.Location,
+		Sandbox:  sandbox,
+	}
+}
+
 // Output GraphViz for a Call.
-func (c Call) Dot(graph CallGraph, weight int) string {
+func (c Call) Dot(graph CallGraph, weight int, flow bool) string {
 	caller := graph.nodes[c.Caller]
 	callee := graph.nodes[c.Callee]
 
 	label := c.CallSite.String()
-	colour := "#993333"
-	if c.Sandbox != "" {
-		colour = "#339933"
+	style := ""
+	width := 1 + math.Log(float64(weight))
+
+	var colour string
+	if flow {
+		colour = PrivateData
+		style = "dashed"
+		weight = 0
+	} else if c.Sandbox == "" {
+		colour = Unspecified
+	} else {
+		colour = Sandboxed
 	}
 
 	attrs := map[string]interface{}{
-		"color":     colour + "66",
+		"color":     colour + "cc",
 		"fontcolor": colour,
 		"label":     label,
-		"penwidth":  1 + math.Log(float64(weight)),
+		"penwidth":  width,
+		"style":     style,
 		"weight":    weight,
 	}
 
 	return fmt.Sprintf("\"%s\" -> \"%s\" %s;\n",
 		caller.Name, callee.Name, dotAttrs(attrs))
+}
+
+func (c Call) String() string {
+	return fmt.Sprintf("'%s' -> '%s'", c.Caller, c.Callee)
 }
 
 //
@@ -721,7 +927,7 @@ func GraphAnalyses() []string {
 	return keys
 }
 
-type callMaker func(GraphNode, GraphNode, CallSite) Call
+type callMaker func(GraphNode, GraphNode, CallSite)
 type nodeMaker func(CallSite) GraphNode
 
 //
@@ -737,14 +943,8 @@ func VulnGraph(results Results, progress func(string)) (CallGraph, error) {
 			return newGraphNode(cs, v.Sandbox)
 		}
 
-		call := func(caller GraphNode, callee GraphNode,
-			cs CallSite) Call {
-			return Call{
-				Caller:   caller.Name,
-				Callee:   callee.Name,
-				CallSite: cs.Location,
-				Sandbox:  v.Sandbox,
-			}
+		call := func(caller GraphNode, callee GraphNode, cs CallSite) {
+			graph.AddCall(newCall(caller, callee, cs, v.Sandbox))
 		}
 
 		top := fn(v.CallSite)
@@ -779,22 +979,21 @@ func PrivAccessGraph(results Results, progress func(string)) (CallGraph, error) 
 	count := 0
 	for _, a := range accesses {
 		trace := results.Traces[a.Trace]
-		sandboxes := strings.Join(a.Sandboxes, ",")
 
 		fn := func(cs CallSite) GraphNode {
-			return newGraphNode(cs, sandboxes)
+			return newGraphNode(cs, "")
 		}
 
-		call := func(caller GraphNode, callee GraphNode, cs CallSite) Call {
-			return Call{
-				Caller:   caller.Name,
-				Callee:   callee.Name,
-				CallSite: cs.Location,
-			}
+		call := func(caller GraphNode, callee GraphNode, cs CallSite) {
+			graph.AddCall(newCall(caller, callee, cs, ""))
+		}
+
+		flow := func(caller GraphNode, callee GraphNode, cs CallSite) {
+			graph.AddFlow(newCall(caller, callee, cs, ""))
 		}
 
 		top := fn(a.CallSite)
-		top.Owners = a.Sandboxes
+		top.Owners = a.DataOwners()
 		graph.AddNode(top)
 
 		g, err := trace.graph(top, results.Traces, fn, call)
@@ -803,6 +1002,16 @@ func PrivAccessGraph(results Results, progress func(string)) (CallGraph, error) 
 		}
 
 		graph.Union(g)
+
+		for _, source := range a.Sources {
+			trace := results.Traces[source.Trace]
+			g, err := trace.graph(top, results.Traces, fn, flow)
+			if err != nil {
+				return CallGraph{}, err
+			}
+
+			graph.Union(g)
+		}
 
 		count++
 		if count%chunk == 0 {
@@ -830,7 +1039,7 @@ func (t CallTrace) graph(top GraphNode, traces []CallTrace,
 		caller := makeNode(cs)
 		graph.AddNode(caller)
 
-		graph.AddCall(makeCall(caller, callee, cs))
+		makeCall(caller, callee, cs)
 		callee = caller
 	})
 

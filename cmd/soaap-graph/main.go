@@ -30,6 +30,9 @@ func main() {
 	//
 	// Command-line arguments:
 	//
+	legend := flag.Bool("legend", false,
+		"emit a Dot legend rather than an actual graph")
+
 	analyses := Analyses{"vuln"}
 	flag.Var(&analyses, "analyses",
 		"SOAAP analysis results to graph (options: "+
@@ -45,20 +48,33 @@ func main() {
 
 	flag.Parse()
 
-	if len(flag.Args()) != 1 {
+	var input string
+	switch len(flag.Args()) {
+	case 0:
+		input = "-"
+
+	case 1:
+		input = flag.Args()[0]
+
+	default:
 		printUsage()
 		return
 	}
 
-	input := flag.Args()[0]
-
 	//
 	// Load input file:
 	//
-	f, err := os.Open(input)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s\n", err)
-		return
+	var f *os.File
+	var err error
+
+	if input == "-" {
+		f = os.Stdin
+	} else {
+		f, err = os.Open(input)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %s\n", err)
+			return
+		}
 	}
 
 	//
@@ -76,42 +92,60 @@ func main() {
 	}
 
 	//
-	// Is the input file a binary-encoded graph or a set of SOAAP results
-	// that we need to extract a graph from?
+	// The call/dataflow graph to transform and output.
 	//
 	var graph soaap.CallGraph
 
-	if strings.HasSuffix(f.Name(), ".graph") {
+	//
+	// Special case: legend of possible node types.
+	//
+	if *legend {
+		graph = soaap.Legend()
+
+	} else if strings.HasSuffix(f.Name(), ".graph") {
+
+		// Load binary graph file.
+		report(fmt.Sprintf("Loading binary graph data from '%s'...", f.Name()))
 		graph, err = soaap.LoadGraph(f, report)
 
 	} else {
+
+		// Load SOAAP results.
+		report(fmt.Sprintf("Loading SOAAP results from '%s'...", f.Name()))
 		graph, err = analyzeResultsFile(f, analyses)
 	}
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s\n", err)
-		return
+		fmt.Fprintf(os.Stderr, "\nerror: %s\n", err)
+		os.Exit(1)
 	}
 
-	nodes, edges := graph.Size()
-	fmt.Printf("Result: %d nodes and %d edges\n", nodes, edges)
+	nodes, edges, flows := graph.Size()
+	fmt.Printf("Result: %d nodes, %d calls and %d flows\n",
+		nodes, edges, flows)
 
 	//
 	// Apply any requested transformations:
 	//
 	if *simplify {
 		graph = graph.Simplified()
-		nodes, edges = graph.Size()
-		fmt.Printf("Simplified: %d nodes and %d edges\n", nodes, edges)
+		nodes, edges, flows = graph.Size()
+		fmt.Printf("Simplified: %d nodes, %d calls and %d flows\n",
+			nodes, edges, flows)
 	}
 
 	//
 	// Output the results:
 	//
+	grouping := *groupBy
+	if *legend {
+		grouping = "tags"
+	}
+
 	if *binout {
 		err = graph.Save(out)
 	} else {
-		err = graph.WriteDot(out, *groupBy)
+		err = graph.WriteDot(out, grouping)
 	}
 
 	if err != nil {
@@ -133,54 +167,8 @@ func analyzeResultsFile(f *os.File, analyses []string) (soaap.CallGraph, error) 
 	graph := soaap.NewCallGraph()
 
 	for _, analysis := range analyses {
-		var combineGraphs func(soaap.CallGraph) error
-		var description string
-
-		switch analysis[0] {
-		case '+':
-			description = "Adding"
-			combineGraphs = graph.Union
-			analysis = analysis[1:]
-
-		case '.':
-			description = fmt.Sprintf("Adding intersection (depth %d) with",
-				intersectionDepth)
-
-			combineGraphs = func(g soaap.CallGraph) error {
-				return graph.AddIntersecting(g,
-					*intersectionDepth)
-			}
-			analysis = analysis[1:]
-
-		case '^':
-			description = fmt.Sprintf("Intersecting (depth %d) with",
-				intersectionDepth)
-
-			combineGraphs = func(g soaap.CallGraph) error {
-				graph, err = graph.Intersect(g,
-					*intersectionDepth, true)
-				return err
-			}
-			analysis = analysis[1:]
-
-		default:
-			description = "Adding"
-			combineGraphs = graph.Union
-		}
-
-		g, err := results.ExtractGraph(analysis, report)
-		if err != nil {
-			return graph, err
-		}
-
-		nodes, edges := g.Size()
-		report(fmt.Sprintf("%s '%s' analysis (%d nodes, %d edges)",
-			description, analysis, nodes, edges))
-
-		err = combineGraphs(g)
-		if err != nil {
-			break
-		}
+		graph, err = soaap.ApplyAnalysis(
+			analysis, &graph, &results, *intersectionDepth, report)
 	}
 
 	return graph, err

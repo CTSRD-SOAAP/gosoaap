@@ -22,13 +22,13 @@ func ParseJSON(f *os.File, progress func(string)) (Results, error) {
 	go progress(fmt.Sprintf("Loading %s", f.Name()))
 	err := decoder.Decode(&top)
 	if err != nil {
-		panic(err)
+		return Results{}, err
 	}
 	raw := top["soaap"]
 
 	var soaap Results
 
-	maxTraceSize := len(raw) - 5
+	maxTraceSize := len(raw)
 	soaap.Traces = make([]CallTrace, maxTraceSize)
 
 	parsed := 0
@@ -41,7 +41,16 @@ func ParseJSON(f *os.File, progress func(string)) (Results, error) {
 		case "access_origin_warning":
 			// TODO
 
+		case "cap_rights_warning":
+			// TODO
+
 		case "classified_warning":
+			// TODO
+
+		case "global_access_warning":
+			// TODO
+
+		case "global_lost_update":
 			// TODO
 
 		case "private_access":
@@ -49,13 +58,38 @@ func ParseJSON(f *os.File, progress func(string)) (Results, error) {
 			for i, vuln := range soaap.PrivateAccess {
 				num, err := traceNumber(vuln.TraceName)
 				if err != nil {
-					panic(err)
+					return Results{}, err
 				}
 
 				soaap.PrivateAccess[i].Trace = num
+
+				// Build a slice of *useful* sources (i.e., those with traces)
+				sources := make([]DataSource, 0)
+
+				for _, source := range vuln.Sources {
+					if source.TraceRef != "" {
+						num, err := traceNumber(source.TraceRef)
+						if err != nil {
+							return Results{}, err
+						}
+						source.Trace = num
+						sources = append(sources, source)
+					}
+				}
+
+				soaap.PrivateAccess[i].Sources = sources
 			}
 
 		case "private_leak":
+			// TODO
+
+		case "privileged_call":
+			// TODO
+
+		case "sandboxed_func":
+			// TODO
+
+		case "syscall_warning":
 			// TODO
 
 		case "vulnerability_warning":
@@ -63,7 +97,7 @@ func ParseJSON(f *os.File, progress func(string)) (Results, error) {
 			for i, vuln := range soaap.Vulnerabilities {
 				num, err := traceNumber(vuln.TraceName)
 				if err != nil {
-					panic(err)
+					return Results{}, err
 				}
 
 				soaap.Vulnerabilities[i].Trace = num
@@ -99,6 +133,11 @@ func ParseJSON(f *os.File, progress func(string)) (Results, error) {
 // need this function any more.
 //
 func parseTrace(j json.RawMessage, traces []CallTrace, index int) error {
+	if index >= len(traces) {
+		return fmt.Errorf("index (%d) too large for traces (len: %d)",
+			index, len(traces))
+	}
+
 	var x map[string]json.RawMessage
 	err := json.Unmarshal(j, &x)
 	if err != nil {
@@ -132,7 +171,7 @@ func parseTrace(j json.RawMessage, traces []CallTrace, index int) error {
 			t.CallSites = append(t.CallSites, tmp)
 		} else {
 			if i != count-1 {
-				panic("unable to convert function")
+				return fmt.Errorf("unable to convert call site %s", v)
 			}
 
 			var tmp map[string]string
